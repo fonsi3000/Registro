@@ -35,16 +35,19 @@ services:
       - "3310:3306"
     environment:
       - MYSQL_DATABASE=registros
-      - MYSQL_USER=root
-      - MYSQL_PASSWORD=Espumas2025*.
       - MYSQL_ROOT_PASSWORD=Espumas2025*.
+      # Removemos MYSQL_USER porque estamos usando root
+      # Removemos MYSQL_PASSWORD porque ya tenemos MYSQL_ROOT_PASSWORD
+      - MYSQL_ROOT_HOST=%  # Permitir conexiones desde cualquier host
+    command: --default-authentication-plugin=mysql_native_password # Usar autenticación nativa
     volumes:
       - db-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pEspumas2025*."]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - registros-network
     restart: unless-stopped
