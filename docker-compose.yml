@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: registros_app
+    ports:
+      - "9090:9090"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_TIMEZONE=America/Bogota
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=registros
+      - DB_USERNAME=root
+      - DB_PASSWORD=Espumas2025*.
+      - APP_LOCALE=es
+      - APP_FALLBACK_LOCALE=es
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - registros-network
+    volumes:
+      - ./storage:/app/storage
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: registros_db
+    ports:
+      - "3310:3306"
+    environment:
+      - MYSQL_DATABASE=registros
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=Espumas2025*.
+      - MYSQL_ROOT_PASSWORD=Espumas2025*.
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - registros-network
+    restart: unless-stopped
+
+networks:
+  registros-network:
+    driver: bridge
+
+volumes:
+  db-data:
