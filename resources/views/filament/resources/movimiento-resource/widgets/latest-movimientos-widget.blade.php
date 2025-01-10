@@ -44,7 +44,6 @@
                </div>
            </button>
        </div>
-</div>
         
        {{-- Información del equipo encontrado con diseño mejorado --}}
        @if($equipoEncontrado && $equipoData)
