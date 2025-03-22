@@ -5,56 +5,64 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: registros_app
+      args:
+        - PHP_VERSION=${PHP_VERSION:-8.2}
+        - APP_ENV=${APP_ENV:-production}
+        - APP_DEBUG=${APP_DEBUG:-false}
+        - APP_TIMEZONE=${APP_TIMEZONE:-America/Bogota}
+        - DB_HOST=${DB_HOST:-db}
+        - DB_PORT=${DB_PORT:-3306}
+        - DB_DATABASE=${DB_DATABASE}
+        - DB_USERNAME=${DB_USERNAME}
+        - DB_PASSWORD=${DB_PASSWORD}
+        - APP_LOCALE=${APP_LOCALE:-es}
+        - APP_FALLBACK_LOCALE=${APP_FALLBACK_LOCALE:-es}
+        - APP_URL=${APP_URL}
+        - APP_KEY=${APP_KEY}
+    container_name: ${APP_CONTAINER_NAME:-registros_app}
     ports:
-      - "9090:9090"
+      - "${APP_PORT:-9090}:9090"
     environment:
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - APP_TIMEZONE=America/Bogota
-      - DB_HOST=db
-      - DB_PORT=3306
-      - DB_DATABASE=registros
-      - DB_USERNAME=root
-      - DB_PASSWORD=Espumas2025*.
-      - APP_LOCALE=es
-      - APP_FALLBACK_LOCALE=es
+      - LARAVEL_PATH=/srv/app
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - registros-network
+      - app-network
     volumes:
-      - ./storage:/app/storage
+      - ./storage:/srv/app/storage
+      - ./.deploy/config:/srv/app/.deploy/config
     restart: unless-stopped
 
   db:
     image: mysql:8.0
-    container_name: registros_db
+    container_name: ${DB_CONTAINER_NAME:-registros_db}
     ports:
-      - "3310:3306"
+      # Solo exponer este puerto si realmente necesitas acceso externo a la BD
+      - "${DB_EXTERNAL_PORT:-3310}:3306"
     environment:
-      - MYSQL_DATABASE=registros
-      - MYSQL_ROOT_PASSWORD=Espumas2025*.
-      # Removemos MYSQL_USER porque estamos usando root
-      # Removemos MYSQL_PASSWORD porque ya tenemos MYSQL_ROOT_PASSWORD
-      - MYSQL_ROOT_HOST=%  # Permitir conexiones desde cualquier host
-    command: --default-authentication-plugin=mysql_native_password # Usar autenticación nativa
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_HOST=${MYSQL_ROOT_HOST:-%}
+    command: --default-authentication-plugin=mysql_native_password
     volumes:
       - db-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pEspumas2025*."]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_HEALTHCHECK_USER:-root}", "-p${DB_HEALTHCHECK_PASSWORD}"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 30s
     networks:
-      - registros-network
+      - app-network
     restart: unless-stopped
 
 networks:
-  registros-network:
+  app-network:
     driver: bridge
 
 volumes:
   db-data:
+    name: ${DB_VOLUME_NAME:-registros_db_data}
