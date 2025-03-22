@@ -112,7 +112,7 @@ COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./.deploy/config/Caddyfile $LARAVEL_PATH/.deploy/config/Caddyfile
 
 # Expose port 80
-EXPOSE 80
+EXPOSE 9090
 
 # Start app
 COPY ./.deploy/entrypoint.sh /
