@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: .deploy/Dockerfile
       args:
         - PHP_VERSION=${PHP_VERSION:-8.2}
         - APP_ENV=${APP_ENV:-production}
