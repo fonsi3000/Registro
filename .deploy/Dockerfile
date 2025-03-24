@@ -41,6 +41,12 @@ RUN chmod 0644 /etc/cron.d/laravel-cron && \
 
 COPY . .
 
+# Crear .env temporal para la construcción
+RUN cp .env.example .env || echo "APP_KEY=base64:$(openssl rand -base64 32)" > .env && \
+    echo "DB_CONNECTION=sqlite" >> .env && \
+    echo "DB_DATABASE=:memory:" >> .env && \
+    touch database/database.sqlite
+
 # Set any ENVs
 ARG APP_KEY=${APP_KEY}
 ARG APP_NAME=${APP_NAME}
@@ -81,13 +87,22 @@ ARG PUSHER_APP_KEY=${PUSHER_APP_KEY}
 ARG PUSHER_APP_SECRET=${PUSHER_APP_SECRET}
 ARG PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
 
-RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts && \
-    composer require laravel/octane --no-interaction && \
-    php artisan key:generate --force && \
-    npm install && npm run build && \
-    chown -R www-data:www-data /var/www/html && \
-    chmod -R 775 storage bootstrap/cache && \
-    rm -rf node_modules
+# Instalar dependencias
+RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts
+RUN composer dump-autoload --optimize --no-dev
+
+# Instalar Octane
+RUN composer require laravel/octane --no-interaction --no-scripts
+
+# Configurar y compilar assets
+RUN php artisan key:generate --force || true
+RUN npm install
+RUN npm run build
+RUN rm -rf node_modules
+
+# Establecer permisos
+RUN chown -R www-data:www-data /var/www/html
+RUN chmod -R 775 storage bootstrap/cache
 
 COPY ./.deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
