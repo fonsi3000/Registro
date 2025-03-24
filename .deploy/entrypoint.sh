@@ -2,14 +2,29 @@
 
 echo "🎬 entrypoint.sh: [$(whoami)] [PHP $(php -r 'echo phpversion();')]"
 
+# Optimizar autoloader
 composer dump-autoload --no-interaction --no-dev --optimize
 
 echo "🎬 artisan commands"
 
-# 💡 Group into a custom command e.g. php artisan app:on-deploy
+# Limpiar y regenerar caché
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+php artisan cache:clear
+
+# Regenerar caché optimizada para producción
+php artisan config:cache
+php artisan route:cache
+
+# Asegurarse de que los directorios de almacenamiento tengan permisos adecuados
+chmod -R 775 /srv/app/storage /srv/app/bootstrap/cache
+
+# Comentados pero disponibles para activar según sea necesario
 # php artisan migrate --no-interaction --force
-# php artisan voyager:install --no-interaction --force
+# php artisan db:seed --no-interaction --force
 
 echo "🎬 start supervisord"
 
-supervisord -c $LARAVEL_PATH/.deploy/config/supervisor.conf
+# Iniciar todos los servicios con supervisord
+supervisord -c /etc/supervisor/conf.d/supervisord.conf
