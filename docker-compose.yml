@@ -29,7 +29,7 @@ services:
     ports:
       - "${APP_PORT:-9090}:9090"
     environment:
-      - LARAVEL_PATH=/srv/app
+      - LARAVEL_PATH=/var/www/html
     depends_on:
       db:
         condition: service_healthy
@@ -38,8 +38,8 @@ services:
     networks:
       - app-network
     volumes:
-      - ./storage:/srv/app/storage
-      - ./.deploy/config:/srv/app/.deploy/config
+      - ./storage:/var/www/html/storage
+      - ./.deploy/config:/var/www/html/.deploy/config
     restart: unless-stopped
 
   db:

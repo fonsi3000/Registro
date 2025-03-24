@@ -1,76 +1,56 @@
-ARG PHP_VERSION=${PHP_VERSION:-8.2}
-FROM php:${PHP_VERSION}-fpm-alpine AS php-system-setup
+FROM ubuntu:22.04
 
-# Install system dependencies
-RUN apk add --no-cache dcron busybox-suid libcap curl zip unzip git \
-    libpng-dev libzip-dev libxml2-dev oniguruma-dev nginx
+ENV DEBIAN_FRONTEND=noninteractive 
+ENV TZ=America/Bogota
+ENV LARAVEL_PATH=/var/www/html
 
-# Install PHP extensions
-COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
-RUN install-php-extensions intl bcmath gd pdo_mysql pdo_pgsql opcache redis uuid exif pcntl zip swoole
+# Actualizar e instalar dependencias básicas
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y bash git sudo openssh-client \
+    libxml2-dev libonig-dev autoconf gcc g++ make \
+    libfreetype6-dev libjpeg-turbo8-dev libpng-dev libzip-dev \
+    curl unzip nano software-properties-common nginx supervisor cron
 
-# Install supervisord implementation
-COPY --from=ochinchina/supervisord:latest /usr/local/bin/supervisord /usr/local/bin/supervisord
+# Instalar Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
 
-# Install composer
-COPY --from=composer/composer:2 /usr/bin/composer /usr/local/bin/composer
+# Instalar PHP y extensiones
+RUN add-apt-repository ppa:ondrej/php -y && \
+    apt-get update && \
+    apt-get install -y php8.2 php8.2-fpm php8.2-cli php8.2-common \
+    php8.2-mysql php8.2-zip php8.2-gd php8.2-mbstring php8.2-curl php8.2-xml php8.2-bcmath \
+    php8.2-intl php8.2-readline php8.2-pcov php8.2-dev php8.2-redis
 
-# Install Node.js for asset compilation
-RUN apk add --no-cache nodejs npm
+# Instalar Swoole para Octane
+RUN pecl install swoole && \
+    echo "extension=swoole.so" > /etc/php/8.2/mods-available/swoole.ini && \
+    phpenmod swoole
 
-FROM php-system-setup AS app-setup
+# Instalar Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Set working directory
-ENV LARAVEL_PATH=/srv/app
+# Configurar directorio de trabajo
 WORKDIR $LARAVEL_PATH
 
-# Add non-root user: 'app'
-ARG NON_ROOT_GROUP=${NON_ROOT_GROUP:-app}
-ARG NON_ROOT_USER=${NON_ROOT_USER:-app}
-RUN addgroup -S $NON_ROOT_GROUP && adduser -S $NON_ROOT_USER -G $NON_ROOT_GROUP
-RUN addgroup $NON_ROOT_USER wheel
+# Configurar Nginx
+COPY ./.deploy/config/nginx.conf /etc/nginx/sites-available/default
+RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
 
-# Set cron job
-COPY ./.deploy/config/crontab /etc/crontabs/$NON_ROOT_USER
-RUN chmod 777 /usr/sbin/crond
-RUN chown -R $NON_ROOT_USER:$NON_ROOT_GROUP /etc/crontabs/$NON_ROOT_USER && setcap cap_setgid=ep /usr/sbin/crond
+# Configurar PHP
+COPY ./.deploy/config/php/local.ini /etc/php/8.2/cli/conf.d/99-local.ini
+COPY ./.deploy/config/php/local.ini /etc/php/8.2/fpm/conf.d/99-local.ini
 
-# Configure Nginx
-COPY ./.deploy/config/nginx.conf /etc/nginx/http.d/default.conf
-
-# Copy PHP configuration
-COPY ./.deploy/config/php/local.ini /usr/local/etc/php/conf.d/local.ini
-
-# Copy entire app first - important for artisan to be available
-COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP . $LARAVEL_PATH/
-
-# Setup supervisor configuration
+# Configurar Supervisor
 COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Set permissions and switch to non-root user
-RUN chown -R $NON_ROOT_USER:$NON_ROOT_GROUP $LARAVEL_PATH
-USER $NON_ROOT_USER
+# Configurar Cron
+COPY ./.deploy/config/crontab /etc/cron.d/laravel-cron
+RUN chmod 0644 /etc/cron.d/laravel-cron && \
+    crontab /etc/cron.d/laravel-cron
 
-# Install dependencies including Laravel Octane
-RUN composer install --prefer-dist --no-dev --no-autoloader
-RUN composer require laravel/octane --with-all-dependencies
-RUN php artisan octane:install --server=swoole || true
-
-# Clean up composer cache
-RUN rm -rf /home/$NON_ROOT_USER/.composer
-
-# Build frontend assets
-RUN if [ -f "package.json" ]; then \
-    npm install && \
-    npm run build && \
-    rm -rf node_modules; \
-    fi
-
-# Optimize composer autoloader
-RUN composer dump-autoload --optimize
-
-# Set permissions for Laravel
-RUN chmod -R 775 storage bootstrap/cache
+# Copiar código de la aplicación
+COPY . $LARAVEL_PATH
 
 # Set any ENVs
 ARG APP_KEY=${APP_KEY}
@@ -112,9 +92,24 @@ ARG PUSHER_APP_KEY=${PUSHER_APP_KEY}
 ARG PUSHER_APP_SECRET=${PUSHER_APP_SECRET}
 ARG PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
 
-# Expose port 9090
+# Instalar dependencias y configurar la aplicación
+RUN composer install --no-interaction --optimize-autoloader --no-dev && \
+    composer require laravel/octane --no-interaction && \
+    php artisan octane:install --server=swoole && \
+    npm install && npm run build && \
+    rm -rf node_modules
+
+# Establecer permisos
+RUN chown -R www-data:www-data $LARAVEL_PATH && \
+    chmod -R 755 $LARAVEL_PATH && \
+    chmod -R 775 $LARAVEL_PATH/storage $LARAVEL_PATH/bootstrap/cache
+
+# Configurar entrypoint
+COPY ./.deploy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Exponer puerto
 EXPOSE 9090
 
-# Start app
-COPY ./.deploy/entrypoint.sh /
-ENTRYPOINT ["sh", "/entrypoint.sh"]
+# Iniciar servicios
+ENTRYPOINT ["/entrypoint.sh"]

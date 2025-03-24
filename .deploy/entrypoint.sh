@@ -1,6 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 echo "🎬 entrypoint.sh: [$(whoami)] [PHP $(php -r 'echo phpversion();')]"
+
+# Cambiar al directorio de la aplicación
+cd $LARAVEL_PATH
 
 # Optimizar autoloader
 composer dump-autoload --no-interaction --no-dev --optimize
@@ -18,7 +21,11 @@ php artisan config:cache
 php artisan route:cache
 
 # Asegurarse de que los directorios de almacenamiento tengan permisos adecuados
-chmod -R 775 /srv/app/storage /srv/app/bootstrap/cache
+chmod -R 775 $LARAVEL_PATH/storage $LARAVEL_PATH/bootstrap/cache
+chown -R www-data:www-data $LARAVEL_PATH/storage $LARAVEL_PATH/bootstrap/cache
+
+# Asegurarse de que PHP-FPM está configurado correctamente
+service php8.2-fpm start
 
 # Comentados pero disponibles para activar según sea necesario
 # php artisan migrate --no-interaction --force
@@ -27,4 +34,4 @@ chmod -R 775 /srv/app/storage /srv/app/bootstrap/cache
 echo "🎬 start supervisord"
 
 # Iniciar todos los servicios con supervisord
-supervisord -c /etc/supervisor/conf.d/supervisord.conf
+exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf
