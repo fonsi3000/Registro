@@ -15,7 +15,7 @@ COPY --from=ochinchina/supervisord:latest /usr/local/bin/supervisord /usr/local/
 # Install composer
 COPY --from=composer/composer:2 /usr/bin/composer /usr/local/bin/composer
 
-# Install Node.js for asset compilation (only necessary for the build phase)
+# Install Node.js for asset compilation
 RUN apk add --no-cache nodejs npm
 
 FROM php-system-setup AS app-setup
@@ -41,19 +41,23 @@ COPY ./.deploy/config/nginx.conf /etc/nginx/http.d/default.conf
 # Copy PHP configuration
 COPY ./.deploy/config/php/local.ini /usr/local/etc/php/conf.d/local.ini
 
-# Switch to non-root 'app' user & install app dependencies
-COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP composer.json composer.lock ./
+# Copy entire app first - important for artisan to be available
+COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP . $LARAVEL_PATH/
+
+# Setup supervisor configuration
+COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Set permissions and switch to non-root user
 RUN chown -R $NON_ROOT_USER:$NON_ROOT_GROUP $LARAVEL_PATH
 USER $NON_ROOT_USER
-RUN composer install --prefer-dist --no-scripts --no-dev --no-autoloader
-RUN rm -rf /home/$NON_ROOT_USER/.composer
 
-# Install Laravel Octane with dependencies
+# Install dependencies including Laravel Octane
+RUN composer install --prefer-dist --no-dev --no-autoloader
 RUN composer require laravel/octane --with-all-dependencies
 RUN php artisan octane:install --server=swoole || true
 
-# Copy app
-COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP . $LARAVEL_PATH/
+# Clean up composer cache
+RUN rm -rf /home/$NON_ROOT_USER/.composer
 
 # Build frontend assets
 RUN if [ -f "package.json" ]; then \
@@ -107,9 +111,6 @@ ARG PUSHER_APP_ID=${PUSHER_APP_ID}
 ARG PUSHER_APP_KEY=${PUSHER_APP_KEY}
 ARG PUSHER_APP_SECRET=${PUSHER_APP_SECRET}
 ARG PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
-
-# Setup supervisor configuration
-COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose port 9090
 EXPOSE 9090
