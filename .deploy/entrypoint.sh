@@ -2,36 +2,25 @@
 
 echo "🎬 entrypoint.sh: [$(whoami)] [PHP $(php -r 'echo phpversion();')]"
 
-# Cambiar al directorio de la aplicación
-cd $LARAVEL_PATH
+cd /var/www/html
 
-# Optimizar autoloader
-composer dump-autoload --no-interaction --no-dev --optimize
+# Instalar dependencias
+composer install --no-interaction --optimize-autoloader --no-dev
+composer require laravel/octane --no-interaction
 
-echo "🎬 artisan commands"
-
-# Limpiar y regenerar caché
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-php artisan cache:clear
-
-# Regenerar caché optimizada para producción
+# Generar key y optimizar
+php artisan key:generate --force
 php artisan config:cache
 php artisan route:cache
 
-# Asegurarse de que los directorios de almacenamiento tengan permisos adecuados
-chmod -R 775 $LARAVEL_PATH/storage $LARAVEL_PATH/bootstrap/cache
-chown -R www-data:www-data $LARAVEL_PATH/storage $LARAVEL_PATH/bootstrap/cache
+# Compilar assets frontend
+npm install
+npm run build
+rm -rf node_modules
 
-# Asegurarse de que PHP-FPM está configurado correctamente
-service php8.2-fpm start
+# Establecer permisos
+chown -R www-data:www-data /var/www/html
+chmod -R 775 storage bootstrap/cache
 
-# Comentados pero disponibles para activar según sea necesario
-# php artisan migrate --no-interaction --force
-# php artisan db:seed --no-interaction --force
-
-echo "🎬 start supervisord"
-
-# Iniciar todos los servicios con supervisord
+# Iniciar servicios con Supervisor
 exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf
