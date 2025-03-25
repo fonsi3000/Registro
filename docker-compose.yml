@@ -120,3 +120,6 @@ volumes:
     name: ${DB_VOLUME_NAME:-registros_db_data}
   redis-data:
     name: ${REDIS_VOLUME_NAME:-registros_redis_data}
+
+
+    # hola
