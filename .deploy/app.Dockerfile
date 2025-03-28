@@ -1,16 +1,20 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.2-fpm-alpine
 
 # Definimos la zona horaria
 ENV TZ=America/Bogota
 # Carpeta donde se instalará Caddy
 ENV CADDY_HOME /usr/local/caddy
 
-# Instalamos dependencias y extensiones PHP necesarias
-RUN apk add --no-cache \
+# Actualizamos los repositorios e instalamos dependencias esenciales
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
     git \
     curl \
     zip \
-    unzip \
+    unzip
+
+# Instalamos dependencias para extensiones PHP
+RUN apk add --no-cache \
     libzip-dev \
     libpng-dev \
     libxml2-dev \
@@ -18,17 +22,25 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     oniguruma-dev \
     linux-headers \
-    tzdata \
-    $PHPIZE_DEPS \
+    tzdata
+
+# Instalamos herramientas de desarrollo PHP
+RUN apk add --no-cache $PHPIZE_DEPS
+
+# Instalamos utilidades del sistema
+RUN apk add --no-cache \
     shadow \
     nano \
-    supervisor \
-    dcron \
-    # Paquetes de Node.js
-    nodejs \
-    npm && \
-    # Configurar e instalar extensiones PHP
-    docker-php-ext-configure gd --with-freetype --with-jpeg && \
+    supervisor
+
+# Instalamos cron (usamos busybox en lugar de dcron)
+RUN apk add --no-cache busybox-initscripts
+
+# Instalamos Node.js
+RUN apk add --no-cache nodejs npm
+
+# Configuramos e instalamos extensiones PHP
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) \
     pdo_mysql \
     mysqli \
@@ -39,14 +51,17 @@ RUN apk add --no-cache \
     gd \
     opcache \
     intl \
-    mbstring && \
-    # Instalar extensión Redis mediante PECL
-    pecl install redis && \
-    docker-php-ext-enable redis && \
-    # Instalar Composer
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
-    # Crear usuario www-data con UID específico
-    usermod -u 1000 www-data && \
+    mbstring
+
+# Instalamos Redis via PECL
+RUN pecl install redis && \
+    docker-php-ext-enable redis
+
+# Instalamos Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Configuramos el usuario www-data
+RUN usermod -u 1000 www-data && \
     groupmod -g 1000 www-data
 
 # Instalar Caddy
@@ -69,19 +84,12 @@ COPY .deploy/config/Caddyfile /etc/caddy/Caddyfile
 # Configuramos Supervisor para gestionar PHP-FPM, Caddy y colas
 COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Configuramos Cron
+# Configuramos Cron usando busybox
 COPY .deploy/config/crontab /etc/crontabs/www-data
 RUN chmod 0644 /etc/crontabs/www-data
 
 # Configuramos directorio de trabajo
 WORKDIR /var/www/html
-
-# Copiamos código de la aplicación
-COPY --chown=www-data:www-data . .
-
-# Establecemos permisos necesarios
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
