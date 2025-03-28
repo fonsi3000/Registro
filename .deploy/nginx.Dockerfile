@@ -1,0 +1,25 @@
+FROM nginx:alpine
+
+# Copiamos la configuración
+COPY .deploy/config/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Eliminamos la configuración predeterminada
+RUN rm -f /etc/nginx/conf.d/default.conf.default
+
+# Creamos los directorios necesarios
+RUN mkdir -p /var/www/html
+
+# Configuramos usuario Nginx
+RUN sed -i 's/user  nginx;/user  www-data;/' /etc/nginx/nginx.conf && \
+    # Aseguramos que el usuario www-data existe
+    adduser -u 1000 -D -S -G www-data www-data || true
+
+# Exponemos puertos
+EXPOSE 80 443
+
+# Configuramos health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:80/ || exit 1
+
+# Comando de inicio
+CMD ["nginx", "-g", "daemon off;"]

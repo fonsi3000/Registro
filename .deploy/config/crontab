@@ -1,2 +1,11 @@
-* * * * * /usr/bin/php /var/www/html/artisan schedule:run > /proc/1/fd/1 2>/proc/1/fd/2
+# Laravel scheduler - Se ejecuta cada minuto
+* * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1
 
+# Limpiar sesiones caducadas - Diario a medianoche
+0 0 * * * cd /var/www/html && php artisan session:gc >> /dev/null 2>&1
+
+# Limpiar trabajos fallidos - Semanal
+0 0 * * 0 cd /var/www/html && php artisan queue:prune-failed --hours=168 >> /dev/null 2>&1
+
+# Limpiar caché - Semanal
+0 0 * * 0 cd /var/www/html && php artisan cache:clear >> /dev/null 2>&1
