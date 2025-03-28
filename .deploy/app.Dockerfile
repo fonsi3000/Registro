@@ -25,10 +25,13 @@ RUN apk update && apk upgrade && \
     linux-headers \
     tzdata \
     nano \
-    supervisor \
-    # Agregar Node.js y npm para compilación de assets
-    nodejs \
-    npm
+    supervisor
+
+# Agregar Node.js y npm para compilación de assets (versiones específicas)
+RUN apk add --no-cache nodejs npm && \
+    npm install -g npm@latest && \
+    # Instalar Vite globalmente
+    npm install -g vite
 
 # Instalar extensiones PHP usando el instalador oficial
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
@@ -92,6 +95,7 @@ RUN chmod +x /entrypoint.sh
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV COMPOSER_MEMORY_LIMIT=-1
 ENV IGNITION_LOCAL=false
+ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

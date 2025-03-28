@@ -39,13 +39,27 @@ else
     php artisan route:cache
     php artisan view:cache
     
-    # Compilar assets si es necesario y npm está disponible
+    # Compilar assets si es necesario
     if [ -f "package.json" ]; then
         echo "📦 Compilando assets para producción..."
         if [ ! -d "node_modules" ]; then
-            npm ci --only=production || npm install --only=production
+            echo "📦 Instalando dependencias de Node.js..."
+            npm ci --quiet || npm install --quiet
         fi
-        npm run build
+        
+        # Verificar si Vite está instalado
+        if ! command -v vite >/dev/null 2>&1; then
+            echo "⚠️ Vite no está instalado globalmente, instalándolo localmente..."
+            npm install --save-dev vite
+        fi
+        
+        # Ejecutar la compilación
+        echo "🔨 Ejecutando build con Vite..."
+        npm run build || {
+            echo "❌ Error al compilar assets con npm run build"
+            echo "🔍 Intentando compilar directamente con npx vite build..."
+            npx vite build
+        }
     fi
 fi
 
