@@ -41,7 +41,7 @@ COPY --from=caddy:2.7.6 /usr/bin/caddy /usr/local/bin/caddy
 RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/caddy
 
 # Instalar composer
-COPY --from=composer/composer:2 /usr/local/bin/composer /usr/local/bin/composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 # Segunda etapa para la configuración de la aplicación
 FROM php-system-setup AS app-setup
