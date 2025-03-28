@@ -27,11 +27,11 @@ RUN apk update && apk upgrade && \
     nano \
     supervisor
 
-# Agregar Node.js y npm para compilación de assets (versiones específicas)
+# Instalar Node.js más reciente para mejor compatibilidad con Vite
 RUN apk add --no-cache nodejs npm && \
-    npm install -g npm@latest && \
-    # Instalar Vite globalmente
-    npm install -g vite
+    npm install -g npm@9.8.1 && \
+    # Instalar Vite globalmente - usamos versión específica para compatibilidad
+    npm install -g vite@4.4.9
 
 # Instalar extensiones PHP usando el instalador oficial
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
@@ -87,6 +87,20 @@ RUN chmod 0644 /etc/crontabs/www-data
 RUN usermod -u 1000 www-data && \
     groupmod -g 1000 www-data
 
+# Primero copiamos solo package.json y package-lock.json para aprovechar el caché de capas
+COPY package*.json ./
+RUN npm ci || npm install
+
+# Copiamos composer.json y composer.lock para instalar dependencias
+COPY composer.json composer.lock ./
+RUN composer install --no-scripts --no-autoloader --no-interaction
+
+# Ahora copiamos el resto de la aplicación
+COPY . .
+
+# Finalizar instalación de Composer
+RUN composer dump-autoload --optimize
+
 # Configurar entrypoint
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -95,6 +109,7 @@ RUN chmod +x /entrypoint.sh
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV COMPOSER_MEMORY_LIMIT=-1
 ENV IGNITION_LOCAL=false
+# Solución para problemas de OpenSSL en Node.js 17+
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # Health check

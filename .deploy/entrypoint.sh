@@ -1,16 +1,11 @@
 #!/bin/sh
 set -e
 
-# Script de entrada para el contenedor de la aplicación Laravel 11
+# Script de entrada para el contenedor de la aplicación Laravel
 
 # Comprobamos entorno
 if [ "$APP_ENV" = "local" ] || [ "$APP_ENV" = "development" ]; then
     echo "🧪 Entorno de desarrollo detectado"
-    # En desarrollo, instalamos dependencias si es necesario
-    if [ ! -d "vendor" ] || [ ! -f "vendor/autoload.php" ]; then
-        echo "📦 Instalando dependencias de Composer..."
-        composer install --no-interaction
-    fi
     
     # Generamos key si no existe
     if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:SomeRandomString" ]; then
@@ -18,20 +13,14 @@ if [ "$APP_ENV" = "local" ] || [ "$APP_ENV" = "development" ]; then
         php artisan key:generate --force
     fi
     
-    # Ejecutamos npm si es necesario
-    if [ -f "package.json" ] && [ ! -d "node_modules" ]; then
-        echo "📦 Instalando dependencias de Node.js..."
-        npm install
-        npm run dev
+    # En desarrollo, ejecutamos Vite en modo desarrollo
+    if [ -f "vite.config.js" ]; then
+        echo "🔥 Iniciando compilación de assets en modo desarrollo..."
+        npm run dev &
     fi
 else
-    # En producción, optimizamos
+    # En producción, optimizamos y compilamos assets
     echo "🚀 Entorno de producción detectado"
-    
-    if [ ! -d "vendor" ] || [ ! -f "vendor/autoload.php" ]; then
-        echo "📦 Instalando dependencias de producción..."
-        composer install --no-dev --no-interaction --optimize-autoloader
-    fi
     
     # Optimizaciones de Laravel para producción
     echo "⚡ Optimizando para producción..."
@@ -39,26 +28,43 @@ else
     php artisan route:cache
     php artisan view:cache
     
-    # Compilar assets si es necesario
-    if [ -f "package.json" ]; then
+    # Compilar assets para producción
+    if [ -f "vite.config.js" ]; then
         echo "📦 Compilando assets para producción..."
-        if [ ! -d "node_modules" ]; then
+        
+        # Verificamos si node_modules existe y está completo
+        if [ ! -d "node_modules/.bin" ]; then
             echo "📦 Instalando dependencias de Node.js..."
-            npm ci --quiet || npm install --quiet
+            npm ci || npm install
         fi
         
-        # Verificar si Vite está instalado
-        if ! command -v vite >/dev/null 2>&1; then
-            echo "⚠️ Vite no está instalado globalmente, instalándolo localmente..."
-            npm install --save-dev vite
-        fi
+        # Compilación de assets con múltiples intentos y manejo de errores
+        echo "🔨 Compilando assets con Vite..."
         
-        # Ejecutar la compilación
-        echo "🔨 Ejecutando build con Vite..."
+        # Intento 1: npm run build (método estándar)
         npm run build || {
-            echo "❌ Error al compilar assets con npm run build"
-            echo "🔍 Intentando compilar directamente con npx vite build..."
-            npx vite build
+            echo "⚠️ npm run build falló, intentando con método alternativo..."
+            
+            # Intento 2: npx vite build
+            npx vite build || {
+                echo "⚠️ npx vite build falló, intentando con acceso directo al binario..."
+                
+                # Intento 3: usar directamente el binario de vite
+                node_modules/.bin/vite build || {
+                    echo "⚠️ Todos los métodos de compilación fallaron."
+                    echo "🔍 Verificando entorno:"
+                    echo "- Node: $(node -v)"
+                    echo "- NPM: $(npm -v)"
+                    echo "- Vite instalado: $(ls -la node_modules/vite 2>/dev/null || echo 'No')"
+                    
+                    # Intento 4: instalación fresca de vite
+                    echo "🔄 Intentando instalar Vite específicamente..."
+                    npm install --save-dev vite@4.4.9
+                    npx vite build || {
+                        echo "❌ No se pudo compilar los assets. La aplicación funcionará sin assets compilados."
+                    }
+                }
+            }
         }
     fi
 fi
@@ -69,19 +75,13 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force
 fi
 
-# Ejecutamos seeders si se nos indica
-if [ "$RUN_SEEDERS" = "true" ]; then
-    echo "🌱 Ejecutando seeders..."
-    php artisan db:seed --force
-fi
-
 # Creamos enlace simbólico para storage si no existe
 if [ ! -L "public/storage" ]; then
     echo "🔗 Creando enlace simbólico para storage..."
     php artisan storage:link
 fi
 
-# Establecemos los permisos correctos para Laravel 11
+# Establecemos los permisos correctos
 echo "🔒 Estableciendo permisos..."
 find /var/www/html/storage -type d -exec chmod 775 {} \;
 find /var/www/html/storage -type f -exec chmod 664 {} \;
@@ -90,4 +90,4 @@ chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Iniciamos supervisor (que gestiona PHP-FPM, Caddy y colas)
 echo "🚦 Iniciando servicios..."
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+exec /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
