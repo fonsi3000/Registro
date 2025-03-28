@@ -7,12 +7,16 @@ COPY .deploy/config/nginx.conf /etc/nginx/conf.d/default.conf
 RUN rm -f /etc/nginx/conf.d/default.conf.default
 
 # Creamos los directorios necesarios
-RUN mkdir -p /var/www/html
+RUN mkdir -p /var/www/html/public
 
 # Configuramos usuario Nginx
 RUN sed -i 's/user  nginx;/user  www-data;/' /etc/nginx/nginx.conf && \
     # Aseguramos que el usuario www-data existe
     adduser -u 1000 -D -S -G www-data www-data || true
+
+# Creamos directorios para logs
+RUN mkdir -p /var/log/nginx && \
+    chown -R www-data:www-data /var/log/nginx
 
 # Exponemos puertos
 EXPOSE 80 443

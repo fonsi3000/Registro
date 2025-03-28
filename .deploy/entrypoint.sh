@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Script de entrada para el contenedor de la aplicación Laravel
+# Script de entrada para el contenedor de la aplicación Laravel 11
 
 # Comprobamos entorno
 if [ "$APP_ENV" = "local" ] || [ "$APP_ENV" = "development" ]; then
@@ -39,10 +39,12 @@ else
     php artisan route:cache
     php artisan view:cache
     
-    # Compilar assets si es necesario
-    if [ -f "package.json" ] && [ ! -d "node_modules" ]; then
+    # Compilar assets si es necesario y npm está disponible
+    if [ -f "package.json" ]; then
         echo "📦 Compilando assets para producción..."
-        npm ci --only=production
+        if [ ! -d "node_modules" ]; then
+            npm ci --only=production || npm install --only=production
+        fi
         npm run build
     fi
 fi
@@ -65,11 +67,12 @@ if [ ! -L "public/storage" ]; then
     php artisan storage:link
 fi
 
-# Establecemos los permisos correctos
+# Establecemos los permisos correctos para Laravel 11
 echo "🔒 Estableciendo permisos..."
 find /var/www/html/storage -type d -exec chmod 775 {} \;
 find /var/www/html/storage -type f -exec chmod 664 {} \;
 chmod -R 775 /var/www/html/bootstrap/cache
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Iniciamos supervisor (que gestiona PHP-FPM, Caddy y colas)
 echo "🚦 Iniciando servicios..."

@@ -33,7 +33,7 @@ services:
       dockerfile: .deploy/app.Dockerfile
       args:
         - APP_ENV=${APP_ENV:-production}
-        - PHP_VERSION=${PHP_VERSION:-8.3}
+        - PHP_VERSION=${PHP_VERSION:-8.2}
     ports:
       - "${APP_PORT:-9090}:9000"
     volumes:
