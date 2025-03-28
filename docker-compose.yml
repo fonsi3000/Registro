@@ -19,7 +19,7 @@ services:
       - laravel-network
     restart: unless-stopped
 
-  # Aplicación Laravel con PHP-FPM y Caddy
+  # Aplicación Laravel con PHP-FPM (sin Caddy)
   app:
     container_name: ${APP_CONTAINER_NAME}
     build:
@@ -28,8 +28,8 @@ services:
       args:
         - APP_ENV=${APP_ENV}
         - PHP_VERSION=${PHP_VERSION}
-    ports:
-      - "${APP_PORT}:9000"
+    expose:
+      - "9000"
     volumes:
       - ./:/var/www/html
       - ./storage/logs/php:/var/log/php
@@ -62,7 +62,6 @@ services:
       - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
-      - CADDY_PORT=${CADDY_PORT}
       - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT}
       - PHP_MAX_EXECUTION_TIME=${PHP_MAX_EXECUTION_TIME}
       - PHP_UPLOAD_MAX_FILESIZE=${PHP_UPLOAD_MAX_FILESIZE}

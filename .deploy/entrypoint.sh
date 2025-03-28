@@ -59,7 +59,7 @@ else
                     
                     # Intento 4: instalación fresca de vite
                     echo "🔄 Intentando instalar Vite específicamente..."
-                    npm install --save-dev vite@4.4.9
+                    npm install --save-dev vite@latest
                     npx vite build || {
                         echo "❌ No se pudo compilar los assets. La aplicación funcionará sin assets compilados."
                     }
@@ -75,6 +75,12 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force
 fi
 
+# Ejecutamos seeders si se nos indica
+if [ "$RUN_SEEDERS" = "true" ]; then
+    echo "🌱 Ejecutando seeders..."
+    php artisan db:seed --force
+fi
+
 # Creamos enlace simbólico para storage si no existe
 if [ ! -L "public/storage" ]; then
     echo "🔗 Creando enlace simbólico para storage..."
@@ -86,8 +92,7 @@ echo "🔒 Estableciendo permisos..."
 find /var/www/html/storage -type d -exec chmod 775 {} \;
 find /var/www/html/storage -type f -exec chmod 664 {} \;
 chmod -R 775 /var/www/html/bootstrap/cache
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Iniciamos supervisor (que gestiona PHP-FPM, Caddy y colas)
+# Iniciamos supervisor (que gestiona PHP-FPM y colas)
 echo "🚦 Iniciando servicios..."
 exec /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
