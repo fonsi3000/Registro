@@ -3,12 +3,13 @@ version: '3.8'
 services:
   # Servidor web Nginx - Actúa como proxy inverso
   nginx:
+    container_name: ${NGINX_CONTAINER_NAME:-registros_nginx}
     build:
       context: .
       dockerfile: .deploy/nginx.Dockerfile
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
     volumes:
       - ./:/var/www/html
       - ./storage/logs/nginx:/var/log/nginx
@@ -17,14 +18,24 @@ services:
     networks:
       - laravel-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # Aplicación Laravel con PHP-FPM y Caddy
   app:
+    container_name: ${APP_CONTAINER_NAME:-registros_app}
     build:
       context: .
       dockerfile: .deploy/app.Dockerfile
       args:
         - APP_ENV=${APP_ENV:-production}
+        - PHP_VERSION=${PHP_VERSION:-8.3}
+    ports:
+      - "${APP_PORT:-9090}:9000"
     volumes:
       - ./:/var/www/html
       - ./storage/logs/php:/var/log/php
@@ -33,57 +44,84 @@ services:
       - APP_KEY=${APP_KEY}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost}
+      - APP_TIMEZONE=${APP_TIMEZONE:-UTC}
+      - APP_LOCALE=${APP_LOCALE:-es}
+      - APP_FALLBACK_LOCALE=${APP_FALLBACK_LOCALE:-es}
       - DB_CONNECTION=${DB_CONNECTION:-mysql}
-      - DB_HOST=db
+      - DB_HOST=${DB_HOST:-db}
       - DB_PORT=${DB_PORT:-3306}
-      - DB_DATABASE=${DB_DATABASE:-laravel}
-      - DB_USERNAME=${DB_USERNAME:-laravel}
+      - DB_DATABASE=${DB_DATABASE:-registros}
+      - DB_USERNAME=${DB_USERNAME:-registros_user}
       - DB_PASSWORD=${DB_PASSWORD:-secret}
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - CACHE_DRIVER=${CACHE_DRIVER:-redis}
       - SESSION_DRIVER=${SESSION_DRIVER:-redis}
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
+      - SESSION_LIFETIME=${SESSION_LIFETIME:-120}
+      - MAIL_MAILER=${MAIL_MAILER:-smtp}
+      - MAIL_HOST=${MAIL_HOST:-mailhog}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USERNAME=${MAIL_USERNAME:-null}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-null}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-null}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-hello@example.com}
+      - MAIL_FROM_NAME=${APP_NAME:-Registros}
       - CADDY_PORT=${CADDY_PORT:-2019}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
+      - PHP_MAX_EXECUTION_TIME=${PHP_MAX_EXECUTION_TIME:-300}
+      - PHP_UPLOAD_MAX_FILESIZE=${PHP_UPLOAD_MAX_FILESIZE:-100M}
+      - PHP_POST_MAX_SIZE=${PHP_POST_MAX_SIZE:-100M}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-false}
+      - RUN_SEEDERS=${RUN_SEEDERS:-false}
     depends_on:
       - db
       - redis
     networks:
       - laravel-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(file_exists('/var/www/html/storage/framework/down') ? 1 : 0);"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Base de datos MySQL/MariaDB
   db:
+    container_name: ${DB_CONTAINER_NAME:-registros_db}
     image: mariadb:10.11-jammy
     ports:
-      - "3306:3306"
+      - "${DB_EXTERNAL_PORT:-3310}:3306"
     environment:
-      - MYSQL_DATABASE=${DB_DATABASE:-laravel}
-      - MYSQL_USER=${DB_USERNAME:-laravel}
+      - MYSQL_DATABASE=${DB_DATABASE:-registros}
+      - MYSQL_USER=${DB_USERNAME:-registros_user}
       - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-root_secret}
+      - MYSQL_ROOT_HOST=${MYSQL_ROOT_HOST:-%}
     volumes:
-      - db-data:/var/lib/mysql
+      - ${DB_VOLUME_NAME:-registros_db_data}:/var/lib/mysql
       - ./.deploy/config/my.cnf:/etc/mysql/conf.d/my.cnf:ro
     networks:
       - laravel-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${DB_HEALTHCHECK_USER:-root}", "-p${DB_HEALTHCHECK_PASSWORD:-root_secret}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   # Redis para caché, colas y sesiones
   redis:
+    container_name: ${REDIS_CONTAINER_NAME:-registros_redis}
     image: redis:alpine
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-null}
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - redis-data:/data
+      - ${REDIS_VOLUME_NAME:-registros_redis_data}:/data
       - ./.deploy/config/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - laravel-network
@@ -93,15 +131,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 # Redes
 networks:
   laravel-network:
+    name: ${DOCKER_NETWORK:-registros_network}
     driver: bridge
 
 # Volúmenes persistentes
 volumes:
-  db-data:
+  registros_db_data:
+    name: ${DB_VOLUME_NAME:-registros_db_data}
     driver: local
-  redis-data:
+  registros_redis_data:
+    name: ${REDIS_VOLUME_NAME:-registros_redis_data}
     driver: local
