@@ -100,8 +100,7 @@ COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 # Configurar cron
 COPY .deploy/config/crontab /etc/cron.d/laravel-cron
 RUN chmod 0644 /etc/cron.d/laravel-cron && \
-    crontab /etc/cron.d/laravel-cron
-
+    echo "" >> /etc/cron.d/laravel-cron
 # Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
