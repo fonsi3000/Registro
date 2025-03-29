@@ -126,9 +126,10 @@ RUN composer install --no-dev --no-scripts --no-interaction
 # Ahora copiar toda la aplicación (incluyendo el archivo artisan)
 COPY . .
 
-# Después de copiar la aplicación completa, ejecutar los comandos de artisan
-RUN composer dump-autoload --optimize --no-dev && \
-    php artisan package:discover --ansi
+# Ejecutar config:clear antes de package:discover para evitar problemas con Sail
+RUN php artisan config:clear || true && \
+    composer dump-autoload --optimize --no-dev && \
+    php artisan package:discover --ansi || true
 
 # Instalar dependencias de Node.js
 RUN npm ci || npm install
