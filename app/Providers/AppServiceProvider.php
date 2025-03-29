@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Forzar el esquema y la URL raíz para todas las URLs generadas por Laravel
+        URL::forceScheme('http');
+        URL::forceRootUrl(config('app.url'));
     }
 }
