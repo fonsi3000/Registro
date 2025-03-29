@@ -1,110 +1,151 @@
-ARG PHP_VERSION=${PHP_VERSION:-8.3}
-FROM php:${PHP_VERSION}-fpm-alpine AS php-system-setup
+# Usar una imagen base de Ubuntu 22.04
+FROM ubuntu:22.04
 
-# Establecer zona horaria y variables de entorno
+# Configurar variables de entorno básicas
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Bogota
 
-# Actualizar repositorios e instalar dependencias del sistema
-RUN apk update && apk upgrade && \
-    apk add --no-cache \
-    curl \
-    zip \
-    unzip \
+# Set any ENVs
+ARG APP_KEY=${APP_KEY}
+ARG APP_NAME=${APP_NAME}
+ARG APP_URL=${APP_URL}
+ARG APP_ENV=${APP_ENV}
+ARG APP_DEBUG=${APP_DEBUG}
+
+ARG LOG_CHANNEL=${LOG_CHANNEL}
+
+ARG DB_CONNECTION=${DB_CONNECTION}
+ARG DB_HOST=${DB_HOST}
+ARG DB_PORT=${DB_PORT}
+ARG DB_DATABASE=${DB_DATABASE}
+ARG DB_USERNAME=${DB_USERNAME}
+ARG DB_PASSWORD=${DB_PASSWORD}
+
+ARG BROADCAST_DRIVER=${BROADCAST_DRIVER}
+ARG CACHE_DRIVER=${CACHE_DRIVER}
+ARG QUEUE_CONNECTION=${QUEUE_CONNECTION}
+ARG SESSION_DRIVER=${SESSION_DRIVER}
+ARG SESSION_LIFETIME=${SESSION_LIFETIME}
+
+ARG REDIS_HOST=${REDIS_HOST}
+ARG REDIS_PASSWORD=${REDIS_PASSWORD}
+ARG REDIS_PORT=${REDIS_PORT}
+
+ARG MAIL_MAILER=${MAIL_MAILER}
+ARG MAIL_HOST=${MAIL_HOST}
+ARG MAIL_PORT=${MAIL_PORT}
+ARG MAIL_USERNAME=${MAIL_USERNAME}
+ARG MAIL_PASSWORD=${MAIL_PASSWORD}
+ARG MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+ARG MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+ARG MAIL_FROM_NAME=${APP_NAME}
+
+ARG PUSHER_APP_ID=${PUSHER_APP_ID}
+ARG PUSHER_APP_KEY=${PUSHER_APP_KEY}
+ARG PUSHER_APP_SECRET=${PUSHER_APP_SECRET}
+ARG PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
+    bash \
     git \
-    dcron \
-    busybox-suid \
-    shadow \
-    libzip-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
+    sudo \
+    openssh-client \
     libxml2-dev \
-    oniguruma-dev \
-    linux-headers \
-    tzdata \
+    libonig-dev \
+    autoconf \
+    gcc \
+    g++ \
+    make \
+    libfreetype6-dev \
+    libjpeg-turbo8-dev \
+    libpng-dev \
+    libzip-dev \
+    curl \
+    unzip \
     nano \
-    supervisor
+    software-properties-common \
+    supervisor \
+    cron
 
-# Instalar Node.js más reciente para mejor compatibilidad con Vite
-RUN apk add --no-cache nodejs npm && \
-    npm install -g npm@latest && \
-    npm install -g vite@latest
+# Instalar Node.js 18.x
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
 
-# Instalar extensiones PHP usando el instalador oficial
-COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
-RUN install-php-extensions \
-    intl \
-    bcmath \
-    gd \
-    pdo_mysql \
-    mysqli \
-    opcache \
-    redis \
-    exif \
-    pcntl \
-    zip \
-    mbstring
+# Agregar el repositorio de PHP 8.2 e instalar PHP y extensiones necesarias
+RUN add-apt-repository ppa:ondrej/php -y && \
+    apt-get update && \
+    apt-get install -y \
+    php8.2 \
+    php8.2-fpm \
+    php8.2-cli \
+    php8.2-common \
+    php8.2-mysql \
+    php8.2-zip \
+    php8.2-gd \
+    php8.2-mbstring \
+    php8.2-curl \
+    php8.2-xml \
+    php8.2-bcmath \
+    php8.2-intl \
+    php8.2-readline \
+    php8.2-redis
 
-# Instalar supervisord desde imagen oficial
-COPY --from=ochinchina/supervisord:latest /usr/local/bin/supervisord /usr/local/bin/supervisord
+# Configurar PHP con tu archivo php.ini personalizado
+COPY .deploy/config/php.ini /etc/php/8.2/cli/conf.d/99-custom.ini
+COPY .deploy/config/php.ini /etc/php/8.2/fpm/conf.d/99-custom.ini
+
+# Configurar PHP-FPM
+RUN sed -i 's/listen = \/run\/php\/php8.2-fpm.sock/listen = 0.0.0.0:9000/g' /etc/php/8.2/fpm/pool.d/www.conf
+
+# Configurar Supervisor
+RUN mkdir -p /etc/supervisor/conf.d
+COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Configurar cron
+COPY .deploy/config/crontab /etc/cron.d/laravel-cron
+RUN chmod 0644 /etc/cron.d/laravel-cron
 
 # Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Segunda etapa para la configuración de la aplicación
-FROM php-system-setup AS app-setup
+# Establecer el directorio de trabajo
+WORKDIR /var/www/html
 
-# Configurar directorio de trabajo
-ENV LARAVEL_PATH=/var/www/html
-WORKDIR $LARAVEL_PATH
-
-# Configurar PHP-FPM
-COPY .deploy/config/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-COPY .deploy/config/php.ini /usr/local/etc/php/conf.d/custom.ini
-
-# Asegurar que los directorios existen
-RUN mkdir -p /etc/supervisor/conf.d
-
-# Configurar Supervisor (versión modificada sin Caddy)
-COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Configurar Cron
-COPY .deploy/config/crontab /etc/crontabs/root
-RUN chmod 0644 /etc/crontabs/root
-
-# Si deseas usar root en lugar de www-data
-# (Nota: esto es menos seguro pero seguimos tu preferencia)
-RUN sed -i 's/user = www-data/user = root/g' /usr/local/etc/php-fpm.d/www.conf
-RUN sed -i 's/group = www-data/group = root/g' /usr/local/etc/php-fpm.d/www.conf
-
-# Primero copiamos solo package.json y package-lock.json para aprovechar el caché de capas
+# Copiar archivos de composer y package.json para optimizar la caché
+COPY composer.json composer.lock ./
 COPY package*.json ./
+
+# Instalar dependencias PHP
+RUN composer install --no-scripts --no-interaction --no-autoloader --no-dev
+
+# Instalar dependencias de Node.js
 RUN npm ci || npm install
 
-# Copiamos composer.json y composer.lock para instalar dependencias
-COPY composer.json composer.lock ./
-RUN composer install --no-scripts --no-autoloader --no-interaction
-
-# Ahora copiamos el resto de la aplicación
+# Copiar el resto de la aplicación
 COPY . .
 
-# Finalizar instalación de Composer
-RUN composer dump-autoload --optimize
+# Compilar assets
+RUN npm run build
+
+# Finalizar la instalación de Composer
+RUN composer dump-autoload --optimize --no-dev
+
+# Configurar permisos (establecidos directamente en el Dockerfile)
+RUN mkdir -p storage/logs bootstrap/cache && \
+    chown -R www-data:www-data /var/www/html && \
+    find /var/www/html/storage -type d -exec chmod 775 {} \; && \
+    find /var/www/html/storage -type f -exec chmod 664 {} \; && \
+    chmod -R 775 /var/www/html/bootstrap/cache
 
 # Configurar entrypoint
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Configuraciones para Laravel
-ENV COMPOSER_ALLOW_SUPERUSER=1
-ENV COMPOSER_MEMORY_LIMIT=-1
-ENV IGNITION_LOCAL=false
-# Solución para problemas de OpenSSL en Node.js 17+
-ENV NODE_OPTIONS=--openssl-legacy-provider
-
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 || exit 1
+    CMD ps aux | grep php-fpm | grep -v grep || exit 1
 
 # Exponer puerto - PHP-FPM
 EXPOSE 9000

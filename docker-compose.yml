@@ -19,7 +19,7 @@ services:
       - laravel-network
     restart: unless-stopped
 
-  # Aplicación Laravel con PHP-FPM (sin Caddy)
+  # Aplicación Laravel con PHP-FPM
   app:
     container_name: ${APP_CONTAINER_NAME}
     build:
