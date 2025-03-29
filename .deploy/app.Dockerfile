@@ -118,7 +118,9 @@ COPY composer.json composer.lock ./
 COPY package*.json ./
 
 # Instalar dependencias PHP
-RUN composer install --no-scripts --no-interaction --no-autoloader --no-dev
+RUN composer install --no-dev --no-scripts --no-interaction && \
+    composer dump-autoload --optimize --no-dev && \
+    php artisan package:discover --ansi
 
 # Instalar dependencias de Node.js
 RUN npm ci || npm install
