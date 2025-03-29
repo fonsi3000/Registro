@@ -122,18 +122,19 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Establecer el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiar toda la aplicación primero
+# Copiar composer.json y composer.lock primero para aprovechar la cache de capas
+COPY composer.json composer.lock ./
+
+# Instalar dependencias PHP sin los archivos del proyecto (para aprovechar la cache)
+RUN composer install --no-scripts --no-autoloader --prefer-dist
+
+# Copiar toda la aplicación ahora
 COPY . .
 
-# Configurar el entorno para evitar conexiones a la base de datos durante la construcción
-ENV DB_CONNECTION=sqlite
-ENV DB_DATABASE=:memory:
-
-# Instalar dependencias PHP
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-# Instalar Octane ahora que tenemos el artisan disponible
+# Instalar Octane explícitamente
 RUN composer require laravel/octane --with-all-dependencies
+
+# Instalar Octane y seleccionar Swoole como servidor
 RUN php artisan octane:install --server=swoole --force
 
 # Verificar y corregir el registro del proveedor de servicios de Octane
@@ -146,9 +147,11 @@ RUN if ! php artisan list | grep -q octane; then \
 # Verificar después de registro manual
 RUN php artisan list | grep octane
 
+# Completar la instalación de composer
+RUN composer dump-autoload --optimize
+
 # Configurar la aplicación
-RUN composer dump-autoload --optimize && \
-    php artisan package:discover --ansi
+RUN php artisan package:discover --ansi
 RUN php artisan config:clear --no-interaction
 RUN php artisan view:clear --no-interaction
 RUN php artisan route:clear --no-interaction
@@ -165,13 +168,10 @@ RUN chown -R www-data:www-data /var/www/html && \
     find /var/www/html/storage -type f -exec chmod 664 {} \; && \
     chmod -R 775 /var/www/html/bootstrap/cache
 
-# Limpiar caché
+# Limpiar caché de paquetes
 RUN apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Restaurar la configuración de la base de datos para producción
-ENV DB_CONNECTION=mysql
 
 # Configurar entrypoint
 COPY .deploy/entrypoint.sh /entrypoint.sh
