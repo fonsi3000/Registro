@@ -98,7 +98,8 @@ COPY .deploy/config/php.ini /etc/php/8.2/fpm/conf.d/99-custom.ini
 
 # Configurar PHP-FPM
 COPY .deploy/config/php-fpm.conf /etc/php/8.2/fpm/pool.d/www.conf
-RUN sed -i 's/listen = \/run\/php\/php8.2-fpm.sock/listen = 0.0.0.0:9000/g' /etc/php/8.2/fpm/pool.d/www.conf
+RUN sed -i 's/listen = \/run\/php\/php8.2-fpm.sock/listen = 0.0.0.0:9000/g' /etc/php/8.2/fpm/pool.d/www.conf && \
+    sed -i 's|error_log = \/var\/log\/php8.2-fpm.log|error_log = \/var\/www\/html\/storage\/logs\/php-fpm.log|g' /etc/php/8.2/fpm/php-fpm.conf
 
 # Configurar Supervisor
 RUN mkdir -p /etc/supervisor/conf.d
@@ -107,8 +108,7 @@ COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 # Configurar cron
 COPY .deploy/config/crontab /etc/cron.d/laravel-cron
 RUN chmod 0644 /etc/cron.d/laravel-cron && \
-    echo "" >> /etc/cron.d/laravel-cron && \
-    crontab -u www-data /etc/cron.d/laravel-cron
+    echo "" >> /etc/cron.d/laravel-cron
 
 # Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -126,9 +126,8 @@ RUN composer install --no-dev --no-scripts --no-interaction
 # Ahora copiar toda la aplicación (incluyendo el archivo artisan)
 COPY . .
 
-# Ejecutar config:clear antes de package:discover para evitar problemas con Sail
-RUN php artisan config:clear || true && \
-    composer dump-autoload --optimize --no-dev && \
+# Después de copiar la aplicación completa, ejecutar los comandos de artisan
+RUN composer dump-autoload --optimize --no-dev && \
     php artisan package:discover --ansi || true
 
 # Instalar dependencias de Node.js
@@ -138,7 +137,9 @@ RUN npm ci || npm install
 RUN npm run build || echo "Asset compilation failed, continuing anyway"
 
 # Configurar permisos (establecidos directamente en el Dockerfile)
-RUN mkdir -p storage/logs bootstrap/cache && \
+RUN mkdir -p /var/www/html/storage/logs /var/www/html/bootstrap/cache && \
+    touch /var/www/html/storage/logs/laravel.log && \
+    touch /var/www/html/storage/logs/php-fpm.log && \
     chown -R www-data:www-data /var/www/html && \
     find /var/www/html/storage -type d -exec chmod 775 {} \; && \
     find /var/www/html/storage -type f -exec chmod 664 {} \; && \

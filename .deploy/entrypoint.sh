@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Iniciando aplicación ..."
+echo "🚀 Iniciando aplicación Laravel 11..."
 
 # Verificar y generar APP_KEY si es necesario
 if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:TuClaveGeneradaConPhpArtisanKeyGenerate" ]; then
@@ -17,16 +17,10 @@ if [ "$APP_ENV" = "production" ]; then
     php artisan view:cache
 fi
 
-# Ejecutar migraciones si está configurado
+# Ejecutar migraciones (habilítalo en .env)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "🔄 Ejecutando migraciones..."
     php artisan migrate --force
-fi
-
-# Ejecutar seeders si está configurado
-if [ "$RUN_SEEDERS" = "true" ]; then
-    echo "🌱 Ejecutando seeders..."
-    php artisan db:seed --force
 fi
 
 # Crear enlace simbólico para storage
@@ -34,6 +28,15 @@ if [ ! -L "public/storage" ]; then
     echo "🔗 Creando enlace simbólico para storage..."
     php artisan storage:link
 fi
+
+# Asegurar permisos correctos antes de iniciar servicios
+echo "🔒 Verificando permisos..."
+mkdir -p /var/www/html/storage/logs
+touch /var/www/html/storage/logs/laravel.log
+find /var/www/html/storage -type d -exec chmod 775 {} \;
+find /var/www/html/storage -type f -exec chmod 664 {} \;
+chmod -R 775 /var/www/html/bootstrap/cache
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Iniciar servicios con supervisor
 echo "🚦 Iniciando servicios..."
