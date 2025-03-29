@@ -5,45 +5,39 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Bogota
 
-# Set any ENVs
-ARG APP_KEY=${APP_KEY}
-ARG APP_NAME=${APP_NAME}
-ARG APP_URL=${APP_URL}
-ARG APP_ENV=${APP_ENV}
-ARG APP_DEBUG=${APP_DEBUG}
-
-ARG LOG_CHANNEL=${LOG_CHANNEL}
-
-ARG DB_CONNECTION=${DB_CONNECTION}
-ARG DB_HOST=${DB_HOST}
-ARG DB_PORT=${DB_PORT}
-ARG DB_DATABASE=${DB_DATABASE}
-ARG DB_USERNAME=${DB_USERNAME}
-ARG DB_PASSWORD=${DB_PASSWORD}
-
-ARG BROADCAST_DRIVER=${BROADCAST_DRIVER}
-ARG CACHE_DRIVER=${CACHE_DRIVER}
-ARG QUEUE_CONNECTION=${QUEUE_CONNECTION}
-ARG SESSION_DRIVER=${SESSION_DRIVER}
-ARG SESSION_LIFETIME=${SESSION_LIFETIME}
-
-ARG REDIS_HOST=${REDIS_HOST}
-ARG REDIS_PASSWORD=${REDIS_PASSWORD}
-ARG REDIS_PORT=${REDIS_PORT}
-
-ARG MAIL_MAILER=${MAIL_MAILER}
-ARG MAIL_HOST=${MAIL_HOST}
-ARG MAIL_PORT=${MAIL_PORT}
-ARG MAIL_USERNAME=${MAIL_USERNAME}
-ARG MAIL_PASSWORD=${MAIL_PASSWORD}
-ARG MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
-ARG MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
-ARG MAIL_FROM_NAME=${APP_NAME}
-
-ARG PUSHER_APP_ID=${PUSHER_APP_ID}
-ARG PUSHER_APP_KEY=${PUSHER_APP_KEY}
-ARG PUSHER_APP_SECRET=${PUSHER_APP_SECRET}
-ARG PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
+# Set any ENVs (estas variables se establecerán en tiempo de ejecución)
+ARG APP_KEY
+ARG APP_NAME
+ARG APP_URL
+ARG APP_ENV
+ARG APP_DEBUG
+ARG LOG_CHANNEL
+ARG DB_CONNECTION
+ARG DB_HOST
+ARG DB_PORT
+ARG DB_DATABASE
+ARG DB_USERNAME
+ARG DB_PASSWORD
+ARG BROADCAST_DRIVER
+ARG CACHE_DRIVER
+ARG QUEUE_CONNECTION
+ARG SESSION_DRIVER
+ARG SESSION_LIFETIME
+ARG REDIS_HOST
+ARG REDIS_PASSWORD
+ARG REDIS_PORT
+ARG MAIL_MAILER
+ARG MAIL_HOST
+ARG MAIL_PORT
+ARG MAIL_USERNAME
+ARG MAIL_PASSWORD
+ARG MAIL_ENCRYPTION
+ARG MAIL_FROM_ADDRESS
+ARG MAIL_FROM_NAME
+ARG PUSHER_APP_ID
+ARG PUSHER_APP_KEY
+ARG PUSHER_APP_SECRET
+ARG PUSHER_APP_CLUSTER
 
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get upgrade -y && \
@@ -106,7 +100,7 @@ COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 # Configurar cron
 COPY .deploy/config/crontab /etc/cron.d/laravel-cron
 RUN chmod 0644 /etc/cron.d/laravel-cron && \
-    echo "" >> /etc/cron.d/laravel-cron
+    crontab /etc/cron.d/laravel-cron
 
 # Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -114,37 +108,43 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Establecer el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiar primero solo los archivos de composer y package.json para aprovechar la caché
-COPY composer.json composer.lock ./
-COPY package*.json ./
+# Copiar archivos de configuración de composer y npm
+COPY composer.json composer.lock package.json package-lock.json* ./
 
 # Instalar dependencias PHP (sin ejecutar scripts)
 RUN composer install --no-dev --no-scripts --no-interaction
 
-# Ahora copiar toda la aplicación (incluyendo el archivo artisan)
+# Instalar Octane antes de copiar el código completo para evitar problemas con package:discover
+RUN composer require laravel/octane --no-scripts --no-interaction && \
+    php artisan octane:install --server=swoole --no-interaction
+
+# Copiar el resto de la aplicación
 COPY . .
 
-# Instalar Octane
-RUN composer require laravel/octane && \
-    php artisan octane:install --server=swoole || true
+# Configurar permisos básicos para poder escribir temporalmente
+RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache && \
+    chmod -R 775 storage bootstrap/cache
 
-# Después de copiar la aplicación completa, ejecutar los comandos de artisan
-RUN composer dump-autoload --optimize --no-dev && \
-    php artisan package:discover --ansi || true
+# Configurar la aplicación (ahora con todo el código en su lugar)
+RUN composer dump-autoload --optimize && \
+    php artisan package:discover --ansi
 
 # Instalar dependencias de Node.js
-RUN npm ci || npm install
+RUN npm ci --no-audit --prefer-offline || npm install --no-audit --prefer-offline
 
 # Compilar assets
 RUN npm run build || echo "Asset compilation failed, continuing anyway"
 
-# Configurar permisos (establecidos directamente en el Dockerfile)
-RUN mkdir -p /var/www/html/storage/logs /var/www/html/bootstrap/cache && \
-    touch /var/www/html/storage/logs/laravel.log && \
-    chown -R www-data:www-data /var/www/html && \
+# Configurar permisos finales
+RUN chown -R www-data:www-data /var/www/html && \
     find /var/www/html/storage -type d -exec chmod 775 {} \; && \
     find /var/www/html/storage -type f -exec chmod 664 {} \; && \
     chmod -R 775 /var/www/html/bootstrap/cache
+
+# Limpiar caché
+RUN apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Configurar entrypoint
 COPY .deploy/entrypoint.sh /entrypoint.sh
@@ -152,7 +152,7 @@ RUN chmod +x /entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD ps aux | grep octane | grep -v grep || exit 1
+    CMD curl -f http://localhost:8000 || exit 1
 
 # Exponer puerto para Octane
 EXPOSE 8000
