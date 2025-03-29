@@ -17,11 +17,11 @@ if [ "$APP_ENV" = "production" ]; then
     php artisan view:cache
 fi
 
-# Ejecutar migraciones (habilítalo en .env)
-if [ "$RUN_MIGRATIONS" = "true" ]; then
-    echo "🔄 Ejecutando migraciones..."
-    php artisan migrate --force
-fi
+# Ejecutar migraciones (crucial para crear la tabla cache)
+echo "🔄 Ejecutando migraciones para crear tablas del sistema..."
+php artisan migrate --force
+php artisan cache:table
+php artisan migrate --force
 
 # Crear enlace simbólico para storage
 if [ ! -L "public/storage" ]; then
@@ -33,6 +33,7 @@ fi
 echo "🔒 Verificando permisos..."
 mkdir -p /var/www/html/storage/logs
 touch /var/www/html/storage/logs/laravel.log
+touch /var/www/html/storage/logs/php-fpm.log
 find /var/www/html/storage -type d -exec chmod 775 {} \;
 find /var/www/html/storage -type f -exec chmod 664 {} \;
 chmod -R 775 /var/www/html/bootstrap/cache

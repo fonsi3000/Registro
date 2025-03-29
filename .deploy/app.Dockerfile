@@ -96,10 +96,15 @@ RUN add-apt-repository ppa:ondrej/php -y && \
 COPY .deploy/config/php.ini /etc/php/8.2/cli/conf.d/99-custom.ini
 COPY .deploy/config/php.ini /etc/php/8.2/fpm/conf.d/99-custom.ini
 
+# Crear directorios necesarios para PHP-FPM
+RUN mkdir -p /run/php && \
+    chmod 755 /run/php
+
 # Configurar PHP-FPM
 COPY .deploy/config/php-fpm.conf /etc/php/8.2/fpm/pool.d/www.conf
 RUN sed -i 's/listen = \/run\/php\/php8.2-fpm.sock/listen = 0.0.0.0:9000/g' /etc/php/8.2/fpm/pool.d/www.conf && \
-    sed -i 's|error_log = \/var\/log\/php8.2-fpm.log|error_log = \/var\/www\/html\/storage\/logs\/php-fpm.log|g' /etc/php/8.2/fpm/php-fpm.conf
+    sed -i 's|error_log = \/var\/log\/php8.2-fpm.log|error_log = \/var\/www\/html\/storage\/logs\/php-fpm.log|g' /etc/php/8.2/fpm/php-fpm.conf && \
+    sed -i 's|pid = /run/php/php8.2-fpm.pid|pid = /run/php-fpm.pid|g' /etc/php/8.2/fpm/php-fpm.conf
 
 # Configurar Supervisor
 RUN mkdir -p /etc/supervisor/conf.d
