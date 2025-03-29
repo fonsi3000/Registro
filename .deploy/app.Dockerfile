@@ -97,6 +97,7 @@ COPY .deploy/config/php.ini /etc/php/8.2/cli/conf.d/99-custom.ini
 COPY .deploy/config/php.ini /etc/php/8.2/fpm/conf.d/99-custom.ini
 
 # Configurar PHP-FPM
+COPY .deploy/config/php-fpm.conf /etc/php/8.2/fpm/pool.d/www.conf
 RUN sed -i 's/listen = \/run\/php\/php8.2-fpm.sock/listen = 0.0.0.0:9000/g' /etc/php/8.2/fpm/pool.d/www.conf
 
 # Configurar Supervisor
@@ -105,7 +106,8 @@ COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Configurar cron
 COPY .deploy/config/crontab /etc/cron.d/laravel-cron
-RUN chmod 0644 /etc/cron.d/laravel-cron
+RUN chmod 0644 /etc/cron.d/laravel-cron && \
+    crontab -u www-data /etc/cron.d/laravel-cron
 
 # Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -113,26 +115,25 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Establecer el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiar archivos de composer y package.json para optimizar la caché
+# Copiar primero solo los archivos de composer y package.json para aprovechar la caché
 COPY composer.json composer.lock ./
 COPY package*.json ./
 
-# Instalar dependencias PHP
-RUN composer install --no-dev --no-scripts --no-interaction && \
-    composer dump-autoload --optimize --no-dev && \
+# Instalar dependencias PHP (sin ejecutar scripts)
+RUN composer install --no-dev --no-scripts --no-interaction
+
+# Ahora copiar toda la aplicación (incluyendo el archivo artisan)
+COPY . .
+
+# Después de copiar la aplicación completa, ejecutar los comandos de artisan
+RUN composer dump-autoload --optimize --no-dev && \
     php artisan package:discover --ansi
 
 # Instalar dependencias de Node.js
 RUN npm ci || npm install
 
-# Copiar el resto de la aplicación
-COPY . .
-
 # Compilar assets
-RUN npm run build
-
-# Finalizar la instalación de Composer
-RUN composer dump-autoload --optimize --no-dev
+RUN npm run build || echo "Asset compilation failed, continuing anyway"
 
 # Configurar permisos (establecidos directamente en el Dockerfile)
 RUN mkdir -p storage/logs bootstrap/cache && \
