@@ -4,6 +4,7 @@ FROM ubuntu:22.04
 # Configurar variables de entorno básicas
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Bogota
+ENV OCTANE_SERVER=swoole
 
 # Set any ENVs
 ARG APP_KEY=${APP_KEY}
@@ -90,14 +91,21 @@ RUN add-apt-repository ppa:ondrej/php -y && \
     php8.2-intl \
     php8.2-readline \
     php8.2-redis \
-    php8.2-dev
+    php8.2-dev \
+    php8.2-swoole
 
-# Instalar Swoole para Octane
-RUN pecl install swoole && \
-    echo "extension=swoole.so" > /etc/php/8.2/cli/conf.d/20-swoole.ini
+# Configurar OPcache para mejor rendimiento
+RUN echo "opcache.enable=1" >> /etc/php/8.2/cli/conf.d/10-opcache.ini && \
+    echo "opcache.memory_consumption=128" >> /etc/php/8.2/cli/conf.d/10-opcache.ini && \
+    echo "opcache.interned_strings_buffer=8" >> /etc/php/8.2/cli/conf.d/10-opcache.ini && \
+    echo "opcache.max_accelerated_files=10000" >> /etc/php/8.2/cli/conf.d/10-opcache.ini && \
+    echo "opcache.validate_timestamps=0" >> /etc/php/8.2/cli/conf.d/10-opcache.ini && \
+    echo "opcache.save_comments=1" >> /etc/php/8.2/cli/conf.d/10-opcache.ini && \
+    echo "opcache.fast_shutdown=1" >> /etc/php/8.2/cli/conf.d/10-opcache.ini
 
-# Configurar PHP con tu archivo php.ini personalizado
-COPY .deploy/config/php.ini /etc/php/8.2/cli/conf.d/99-custom.ini
+# Configurar PHP para mejor rendimiento con Octane
+RUN echo "memory_limit=512M" >> /etc/php/8.2/cli/conf.d/99-custom.ini && \
+    echo "max_execution_time=60" >> /etc/php/8.2/cli/conf.d/99-custom.ini
 
 # Configurar Supervisor
 RUN mkdir -p /etc/supervisor/conf.d
@@ -114,26 +122,36 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Establecer el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiar archivos de configuración de composer y npm
-COPY composer.json composer.lock package.json package-lock.json* ./
-
-# Instalar dependencias PHP (sin ejecutar scripts)
-RUN composer install --no-dev --no-scripts --no-interaction
-
-# Copiar el resto de la aplicación
+# Copiar toda la aplicación primero
 COPY . .
 
-# Configurar permisos básicos para poder escribir temporalmente
-RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache && \
-    chmod -R 775 storage bootstrap/cache
+# Configurar el entorno para evitar conexiones a la base de datos durante la construcción
+ENV DB_CONNECTION=sqlite
+ENV DB_DATABASE=:memory:
+
+# Instalar dependencias PHP
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Instalar Octane ahora que tenemos el artisan disponible
-RUN composer require laravel/octane --no-dev && \
-    php artisan octane:install --server=swoole
+RUN composer require laravel/octane --with-all-dependencies
+RUN php artisan octane:install --server=swoole --force
+
+# Verificar y corregir el registro del proveedor de servicios de Octane
+RUN php artisan list | grep octane || echo "Octane no está registrado correctamente; registrando manualmente"
+RUN if ! php artisan list | grep -q octane; then \
+    echo "class_exists('\Laravel\Octane\OctaneServiceProvider') || exit(1);" | php && \
+    sed -i "/App\\\\Providers\\\\RouteServiceProvider::class,/a \        Laravel\\\\Octane\\\\OctaneServiceProvider::class," config/app.php; \
+    fi
+
+# Verificar después de registro manual
+RUN php artisan list | grep octane
 
 # Configurar la aplicación
 RUN composer dump-autoload --optimize && \
     php artisan package:discover --ansi
+RUN php artisan config:clear --no-interaction
+RUN php artisan view:clear --no-interaction
+RUN php artisan route:clear --no-interaction
 
 # Instalar dependencias de Node.js
 RUN npm ci --no-audit --prefer-offline || npm install --no-audit --prefer-offline
@@ -151,6 +169,9 @@ RUN chown -R www-data:www-data /var/www/html && \
 RUN apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Restaurar la configuración de la base de datos para producción
+ENV DB_CONNECTION=mysql
 
 # Configurar entrypoint
 COPY .deploy/entrypoint.sh /entrypoint.sh
