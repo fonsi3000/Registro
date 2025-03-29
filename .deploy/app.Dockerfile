@@ -78,7 +78,6 @@ RUN add-apt-repository ppa:ondrej/php -y && \
     apt-get update && \
     apt-get install -y \
     php8.2 \
-    php8.2-fpm \
     php8.2-cli \
     php8.2-common \
     php8.2-mysql \
@@ -90,35 +89,19 @@ RUN add-apt-repository ppa:ondrej/php -y && \
     php8.2-bcmath \
     php8.2-intl \
     php8.2-readline \
-    php8.2-redis
+    php8.2-redis \
+    php8.2-dev
+
+# Instalar Swoole para Octane
+RUN pecl install swoole && \
+    echo "extension=swoole.so" > /etc/php/8.2/cli/conf.d/20-swoole.ini
 
 # Configurar PHP con tu archivo php.ini personalizado
 COPY .deploy/config/php.ini /etc/php/8.2/cli/conf.d/99-custom.ini
-COPY .deploy/config/php.ini /etc/php/8.2/fpm/conf.d/99-custom.ini
-
-# Crear directorios necesarios para PHP-FPM
-RUN mkdir -p /run/php && \
-    chown -R root:root /run/php && \
-    chmod 755 /run/php
-
-# Configurar PHP-FPM
-COPY .deploy/config/php-fpm.conf /etc/php/8.2/fpm/pool.d/www.conf
-RUN sed -i 's/listen = \/run\/php\/php8.2-fpm.sock/listen = 0.0.0.0:9000/g' /etc/php/8.2/fpm/pool.d/www.conf && \
-    sed -i 's|error_log = \/var\/log\/php8.2-fpm.log|error_log = \/var\/www\/html\/storage\/logs\/php-fpm.log|g' /etc/php/8.2/fpm/php-fpm.conf && \
-    sed -i 's|pid = /run/php/php8.2-fpm.pid|pid = /run/php/php-fpm.pid|g' /etc/php/8.2/fpm/php-fpm.conf
-
-# Modificar la configuración de www.conf para usar root
-RUN sed -i 's/user = www-data/user = root/g' /etc/php/8.2/fpm/pool.d/www.conf && \
-    sed -i 's/group = www-data/group = root/g' /etc/php/8.2/fpm/pool.d/www.conf && \
-    sed -i 's/listen.owner = www-data/listen.owner = root/g' /etc/php/8.2/fpm/pool.d/www.conf && \
-    sed -i 's/listen.group = www-data/listen.group = root/g' /etc/php/8.2/fpm/pool.d/www.conf
 
 # Configurar Supervisor
 RUN mkdir -p /etc/supervisor/conf.d
 COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Asegurarnos de que la configuración de supervisor para php-fpm es correcta
-RUN sed -i 's|command=/usr/sbin/php-fpm8.2 --nodaemonize|command=/usr/sbin/php-fpm8.2 -F|g' /etc/supervisor/conf.d/supervisord.conf || true
 
 # Configurar cron
 COPY .deploy/config/crontab /etc/cron.d/laravel-cron
@@ -141,6 +124,10 @@ RUN composer install --no-dev --no-scripts --no-interaction
 # Ahora copiar toda la aplicación (incluyendo el archivo artisan)
 COPY . .
 
+# Instalar Octane
+RUN composer require laravel/octane && \
+    php artisan octane:install --server=swoole
+
 # Después de copiar la aplicación completa, ejecutar los comandos de artisan
 RUN composer dump-autoload --optimize --no-dev && \
     php artisan package:discover --ansi || true
@@ -154,7 +141,6 @@ RUN npm run build || echo "Asset compilation failed, continuing anyway"
 # Configurar permisos (establecidos directamente en el Dockerfile)
 RUN mkdir -p /var/www/html/storage/logs /var/www/html/bootstrap/cache && \
     touch /var/www/html/storage/logs/laravel.log && \
-    touch /var/www/html/storage/logs/php-fpm.log && \
     chown -R www-data:www-data /var/www/html && \
     find /var/www/html/storage -type d -exec chmod 775 {} \; && \
     find /var/www/html/storage -type f -exec chmod 664 {} \; && \
@@ -166,10 +152,10 @@ RUN chmod +x /entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD ps aux | grep php-fpm | grep -v grep || exit 1
+    CMD ps aux | grep octane | grep -v grep || exit 1
 
-# Exponer puerto - PHP-FPM
-EXPOSE 9000
+# Exponer puerto para Octane
+EXPOSE 8000
 
 # Iniciar servicios
 ENTRYPOINT ["/entrypoint.sh"]
