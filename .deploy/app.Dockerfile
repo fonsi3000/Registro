@@ -126,7 +126,7 @@ COPY . .
 
 # Instalar Octane
 RUN composer require laravel/octane && \
-    php artisan octane:install --server=swoole
+    php artisan octane:install --server=swoole || true
 
 # Después de copiar la aplicación completa, ejecutar los comandos de artisan
 RUN composer dump-autoload --optimize --no-dev && \
