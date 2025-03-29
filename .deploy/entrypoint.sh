@@ -1,7 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Iniciando aplicación Laravel 11..."
+echo "🚀 Iniciando aplicación ..."
+
+# Verificar y generar APP_KEY si es necesario
+if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:TuClaveGeneradaConPhpArtisanKeyGenerate" ]; then
+    echo "🔑 Generando clave de aplicación..."
+    php artisan key:generate --force
+fi
 
 # Verificar entorno y optimizar según corresponda
 if [ "$APP_ENV" = "production" ]; then
