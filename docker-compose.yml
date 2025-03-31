@@ -13,8 +13,8 @@ services:
     depends_on:
       - app
     networks:
-      - registros_network
-    container_name: registros_nginx
+      - ${DOCKER_NETWORK}
+    container_name: ${NGINX_CONTAINER_NAME}
 
   app:
     build:
@@ -41,15 +41,15 @@ services:
       LOG_LEVEL: ${LOG_LEVEL}
 
       DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
       DB_DATABASE: ${DB_DATABASE}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
 
-      REDIS_HOST: redis
+      REDIS_HOST: ${REDIS_HOST}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_PORT}
 
       BROADCAST_DRIVER: ${BROADCAST_DRIVER}
       CACHE_DRIVER: ${CACHE_DRIVER}
@@ -71,16 +71,17 @@ services:
       SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}
       SESSION_DOMAIN: ${SESSION_DOMAIN}
       OCTANE_SERVER: swoole
-      RUN_MIGRATIONS: "true"
-      RUN_SEEDERS: "false"
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS}"
+      RUN_SEEDERS: "${RUN_SEEDERS}"
+
     volumes:
       - .:/var/www/html
     depends_on:
       - db
       - redis
     networks:
-      - registros_network
-    container_name: registros_app
+      - ${DOCKER_NETWORK}
+    container_name: ${APP_CONTAINER_NAME}
     ports:
       - "${APP_PORT:-8000}:8000"
 
@@ -94,12 +95,12 @@ services:
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_ROOT_HOST: '%'
+      MYSQL_ROOT_HOST: ${MYSQL_ROOT_HOST}
     volumes:
-      - registros_db_data:/var/lib/mysql
+      - ${DB_VOLUME_NAME}:/var/lib/mysql
     networks:
-      - registros_network
-    container_name: registros_db
+      - ${DOCKER_NETWORK}
+    container_name: ${DB_CONTAINER_NAME}
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_HEALTHCHECK_USER}", "-p${DB_HEALTHCHECK_PASSWORD}"]
       interval: 10s
@@ -112,10 +113,10 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - registros_redis_data:/data
+      - ${REDIS_VOLUME_NAME}:/data
     networks:
-      - registros_network
-    container_name: registros_redis
+      - ${DOCKER_NETWORK}
+    container_name: ${REDIS_CONTAINER_NAME}
 
 networks:
   registros_network:
