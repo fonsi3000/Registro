@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
 # Copiamos la configuración
-COPY .deploy/config/nginx.conf /etc/nginx/conf.d/default.conf
+COPY .deploy/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Eliminamos la configuración predeterminada
 RUN rm -f /etc/nginx/conf.d/default.conf.default
@@ -17,6 +17,9 @@ RUN sed -i 's/user  nginx;/user  www-data;/' /etc/nginx/nginx.conf && \
 # Creamos directorios para logs
 RUN mkdir -p /var/log/nginx && \
     chown -R www-data:www-data /var/log/nginx
+
+# Creamos directorio SSL si no existe
+RUN mkdir -p /etc/nginx/ssl
 
 # Exponemos puertos
 EXPOSE 80 443
