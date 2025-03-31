@@ -56,4 +56,7 @@ RUN chmod +x /entrypoint.sh \
     && chmod 0644 /etc/cron.d/laravel \
     && crontab /etc/cron.d/laravel
 
+
+COPY .deploy/config/supervisord.conf /etc/supervisor/conf.d/supervisor.conf
+
 ENTRYPOINT ["/entrypoint.sh"]
