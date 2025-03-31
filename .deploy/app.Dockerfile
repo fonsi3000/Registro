@@ -1,59 +1,64 @@
-FROM php:8.2-cli
+# Dockerfile para app Laravel con Octane + Swoole en Alpine
+FROM php:8.2-cli-alpine
 
-# Instalación de extensiones requeridas por Laravel y Filament
-RUN apt-get update && apt-get install -y \
-    build-essential \
+# Instalar dependencias del sistema
+RUN apk add --no-cache \
+    bash \
     libpng-dev \
-    libjpeg-dev \
-    libonig-dev \
+    libjpeg-turbo-dev \
+    libwebp-dev \
+    libxpm-dev \
+    freetype-dev \
+    oniguruma-dev \
     libxml2-dev \
-    libzip-dev \
     zip \
     unzip \
     curl \
     git \
-    vim \
-    cron \
     supervisor \
-    libicu-dev \
-    netcat-openbsd \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
+    libzip-dev \
+    zlib-dev \
+    vim \
+    brotli-dev \
+    icu-dev \
+    tzdata \
+    busybox-suid \
+    shadow \
+    openrc \
+    libgcc \
+    libstdc++ \
+    mysql-client \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath zip intl opcache
+
+# Instalar GD
+RUN docker-php-ext-configure gd \
+    --with-freetype \
+    --with-jpeg \
+    --with-webp \
+    --with-xpm \
+    && docker-php-ext-install -j$(nproc) gd
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Instalar Swoole (para Laravel Octane)
-RUN pecl install swoole && docker-php-ext-enable swoole
+# Instalar Swoole sin soporte Brotli
+RUN pecl install swoole \
+    && docker-php-ext-enable swoole
 
-# Configuración PHP
-ARG PHP_MEMORY_LIMIT=256M
-ARG PHP_MAX_EXECUTION_TIME=300
-ARG PHP_UPLOAD_MAX_FILESIZE=100M
-ARG PHP_POST_MAX_SIZE=100M
-ARG OPCACHE_MEMORY_CONSUMPTION=128
-ARG OPCACHE_VALIDATE_TIMESTAMPS=0
+# Crear usuario de app
+RUN addgroup -g 1000 app && \
+    adduser -D -G app -u 1000 app
 
-RUN echo "memory_limit=${PHP_MEMORY_LIMIT}" > /usr/local/etc/php/conf.d/limits.ini \
-    && echo "max_execution_time=${PHP_MAX_EXECUTION_TIME}" >> /usr/local/etc/php/conf.d/limits.ini \
-    && echo "upload_max_filesize=${PHP_UPLOAD_MAX_FILESIZE}" >> /usr/local/etc/php/conf.d/limits.ini \
-    && echo "post_max_size=${PHP_POST_MAX_SIZE}" >> /usr/local/etc/php/conf.d/limits.ini
-
-# Configuración de OPcache para producción
-RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.validate_timestamps=${OPCACHE_VALIDATE_TIMESTAMPS}" >> /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.memory_consumption=${OPCACHE_MEMORY_CONSUMPTION}" >> /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.interned_strings_buffer=16" >> /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.max_accelerated_files=10000" >> /usr/local/etc/php/conf.d/opcache.ini
-
-# Configuración del contenedor
+# Crear directorio de trabajo
 WORKDIR /var/www/html
 
-COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
-COPY .deploy/config/crontab /etc/cron.d/laravel
+# Copiar archivos de configuración
 COPY .deploy/entrypoint.sh /entrypoint.sh
+COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
+COPY .deploy/config/crontab /etc/crontabs/root
 
-RUN chmod +x /entrypoint.sh \
-    && chmod 0644 /etc/cron.d/laravel \
-    && crontab /etc/cron.d/laravel
+RUN chmod +x /entrypoint.sh && chmod 0644 /etc/crontabs/root
+
+USER app
 
 ENTRYPOINT ["/entrypoint.sh"]
