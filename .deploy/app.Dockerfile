@@ -91,8 +91,8 @@ RUN mkdir -p storage/logs \
     && chmod -R 775 storage bootstrap/cache
 
 # Copia configuración de supervisor y cron
-COPY .deploy/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
-COPY .deploy/crontab /etc/crontabs/$NON_ROOT_USER
+COPY .deploy/config/crontab /etc/crontabs/www-data
+COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod 0644 /etc/crontabs/$NON_ROOT_USER && chmod +x /usr/sbin/crond
 
 # Entrypoint
