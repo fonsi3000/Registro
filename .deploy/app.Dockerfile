@@ -16,18 +16,19 @@ RUN apt-get update && apt-get install -y \
     libbrotli-dev \
     vim \
     cron \
+    netcat \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# 2. Instalar Composer desde contenedor oficial
+# 2. Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# 3. Instalar Swoole desde PECL con soporte Brotli
+# 3. Instalar Swoole para Laravel Octane
 RUN pecl install swoole && docker-php-ext-enable swoole
 
-# 4. Crear directorio de trabajo
+# 4. Directorio de trabajo
 WORKDIR /var/www
 
-# 5. Copiar archivos de configuración (desde carpeta `.deploy`)
+# 5. Copiar configuraciones
 COPY .deploy/entrypoint.sh /entrypoint.sh
 COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
 COPY .deploy/config/crontab /etc/cron.d/laravel
