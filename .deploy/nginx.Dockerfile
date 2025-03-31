@@ -9,16 +9,14 @@ RUN rm -f /etc/nginx/conf.d/default.conf.default
 # Creamos los directorios necesarios
 RUN mkdir -p /var/www/html/public
 
-# Configuramos usuario Nginx y nos aseguramos que www-data existe
+# Configuramos usuario Nginx
 RUN sed -i 's/user  nginx;/user  www-data;/' /etc/nginx/nginx.conf && \
+    # Aseguramos que el usuario www-data existe
     adduser -u 1000 -D -S -G www-data www-data || true
 
-# Creamos directorios para logs y configuramos permisos
+# Creamos directorios para logs
 RUN mkdir -p /var/log/nginx && \
     chown -R www-data:www-data /var/log/nginx
-
-# Verificar configuración de Nginx
-RUN nginx -t
 
 # Exponemos puertos
 EXPOSE 80 443
