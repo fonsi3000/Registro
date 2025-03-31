@@ -2,35 +2,34 @@
 
 echo "🚀 Iniciando contenedor de Laravel..."
 
-# Esperar a que MySQL esté disponible
-echo "⌛ Esperando a MySQL en $DB_HOST:$DB_PORT..."
-until nc -z -v -w30 $DB_HOST $DB_PORT
-do
-  echo "⏳ Esperando a que MySQL esté disponible..."
-  sleep 5
-done
-echo "✅ MySQL está disponible."
+# Esperar a MySQL si es necesario
+if [ -n "$DB_HOST" ]; then
+  echo "⌛ Esperando a MySQL en $DB_HOST..."
+  while ! nc -z $DB_HOST 3306; do
+    sleep 1
+    echo "⏳ Esperando a que MySQL esté disponible..."
+  done
+fi
 
-# Ejecutar migraciones si está habilitado
+# Ejecutar migraciones y seeders si está habilitado
 if [ "$RUN_MIGRATIONS" = "true" ]; then
   echo "📂 Ejecutando migraciones..."
   php artisan migrate --force
 fi
 
-# Ejecutar seeders si está habilitado
 if [ "$RUN_SEEDERS" = "true" ]; then
   echo "🌱 Ejecutando seeders..."
   php artisan db:seed --force
 fi
 
-# Asignar permisos
+# Cache de Laravel para producción
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan event:cache
+
 echo "🔒 Configurando permisos..."
-chmod -R ug+rwx storage bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
 
-# Optimización de Laravel
-echo "⚡ Optimizando Laravel..."
-php artisan optimize
-
-# Iniciar supervisord
 echo "🧠 Iniciando supervisord (cron + Octane)..."
-exec supervisord -n -c /etc/supervisor/conf.d/supervisor.conf
+/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
