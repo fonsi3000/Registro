@@ -1,11 +1,23 @@
-# Laravel scheduler - Se ejecuta cada minuto
+# Laravel Scheduler - Se ejecuta cada minuto
 * * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1
 
 # Limpiar sesiones caducadas - Diario a medianoche
 0 0 * * * cd /var/www/html && php artisan session:gc >> /dev/null 2>&1
 
-# Limpiar trabajos fallidos - Semanal
-0 0 * * 0 cd /var/www/html && php artisan queue:prune-failed --hours=168 >> /dev/null 2>&1
+@REM # Limpiar trabajos fallidos - Semanal (Domingo a medianoche)
+@REM 0 0 * * 0 cd /var/www/html && php artisan queue:prune-failed --hours=168 >> /dev/null 2>&1
 
-# Limpiar caché - Semanal
-0 0 * * 0 cd /var/www/html && php artisan cache:clear >> /dev/null 2>&1
+@REM # Limpiar caché - Semanal (Domingo a medianoche)
+@REM 0 0 * * 0 cd /var/www/html && php artisan cache:clear >> /dev/null 2>&1
+
+@REM # Limpiar vistas compiladas - Semanal (Domingo a medianoche)
+@REM 0 0 * * 0 cd /var/www/html && php artisan view:clear >> /dev/null 2>&1
+
+@REM # Optimizar la aplicación - Semanal (Domingo a la 1 AM)
+@REM 0 1 * * 0 cd /var/www/html && php artisan optimize >> /dev/null 2>&1
+
+@REM # Verificar integridad de la base de datos - Semanal (Domingo a las 2 AM)
+@REM 0 2 * * 0 cd /var/www/html && php artisan db:monitor >> /dev/null 2>&1
+
+@REM # Respaldo de la base de datos - Diario a las 3 AM
+@REM 0 3 * * * cd /var/www/html && php artisan backup:run --only-db >> /dev/null 2>&1

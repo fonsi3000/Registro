@@ -14,7 +14,8 @@ services:
       - ./public:/var/www/html/public:ro
       - ./storage/logs/nginx:/var/log/nginx
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - laravel-network
     restart: unless-stopped
@@ -47,6 +48,8 @@ services:
         - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./:/var/www/html
+      - /var/www/html/vendor
+      - /var/www/html/node_modules
       - ./storage/logs/php:/var/log/php
     environment:
       - APP_ENV=${APP_ENV}
@@ -87,8 +90,10 @@ services:
     expose:
       - "8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - laravel-network
     restart: unless-stopped
@@ -136,7 +141,7 @@ services:
       - laravel-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
