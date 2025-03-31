@@ -11,7 +11,7 @@ RUN install-php-extensions intl bcmath gd pdo_mysql opcache redis uuid exif pcnt
 # Install supervisord implementation
 COPY --from=ochinchina/supervisord:latest /usr/local/bin/supervisord /usr/local/bin/supervisord
 
-# Install composer (corregido)
+# Install composer
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 FROM php-system-setup AS app-setup
@@ -20,11 +20,21 @@ FROM php-system-setup AS app-setup
 ENV LARAVEL_PATH=/var/www/html
 WORKDIR $LARAVEL_PATH
 
-# Add non-root user: 'app'
+# Configure non-root user (using existing www-data)
 ARG NON_ROOT_GROUP=${NON_ROOT_GROUP:-www-data}
 ARG NON_ROOT_USER=${NON_ROOT_USER:-www-data}
-RUN addgroup -S $NON_ROOT_GROUP && adduser -S $NON_ROOT_USER -G $NON_ROOT_GROUP
-RUN addgroup $NON_ROOT_USER wheel
+
+# Make sure www-data is in wheel group (if it exists)
+RUN if getent group wheel > /dev/null; then \
+    if getent passwd $NON_ROOT_USER > /dev/null; then \
+    addgroup $NON_ROOT_USER wheel; \
+    fi \
+    else \
+    addgroup -S wheel; \
+    if getent passwd $NON_ROOT_USER > /dev/null; then \
+    addgroup $NON_ROOT_USER wheel; \
+    fi \
+    fi
 
 # Configuración de OPcache para producción
 ARG OPCACHE_VALIDATE_TIMESTAMPS
