@@ -1,11 +1,1 @@
-# Laravel Scheduler
-* * * * * cd /var/www/html && php artisan schedule:run >> /var/www/html/storage/logs/cron.log 2>&1
-
-# Optimización diaria (a las 2:00 AM)
-0 2 * * * cd /var/www/html && php artisan optimize >> /var/www/html/storage/logs/cron.log 2>&1
-
-# Limpieza semanal de caché (cada domingo a las 3:00 AM)
-0 3 * * 0 cd /var/www/html && php artisan cache:clear >> /var/www/html/storage/logs/cron.log 2>&1
-
-# Backup diario de la base de datos (a las 1:00 AM)
-0 1 * * * cd /var/www/html && php artisan db:backup >> /var/www/html/storage/logs/cron.log 2>&1
+* * * * * cd /var/www && php artisan schedule:run >> /dev/null 2>&1
