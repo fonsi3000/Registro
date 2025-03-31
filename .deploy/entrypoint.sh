@@ -4,6 +4,8 @@ set -e
 
 echo "🚀 Iniciando contenedor de Laravel..."
 
+cd /var/www/html
+
 # Esperar a que la base de datos esté disponible
 echo "⌛ Esperando a MySQL en $DB_HOST:$DB_PORT..."
 until nc -z "$DB_HOST" "$DB_PORT"; do
