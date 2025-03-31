@@ -45,7 +45,7 @@ RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.max_accelerated_files=10000" >> /usr/local/etc/php/conf.d/opcache.ini
 
 # Directorio de trabajo
-WORKDIR /var/www
+WORKDIR /var/www/html
 
 # Copiar configuraciones
 COPY .deploy/entrypoint.sh /entrypoint.sh
