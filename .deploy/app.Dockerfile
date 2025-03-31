@@ -1,8 +1,6 @@
-# Usa PHP 8.2 con FPM sobre Alpine como base
 ARG PHP_VERSION=8.2
 FROM php:${PHP_VERSION}-fpm-alpine AS base
 
-# Instala dependencias del sistema necesarias
 RUN apk add --no-cache \
     bash \
     curl \
@@ -18,7 +16,6 @@ RUN apk add --no-cache \
     zlib-dev \
     supervisor \
     vim \
-    shadow \
     autoconf \
     g++ \
     make \
@@ -30,9 +27,9 @@ RUN apk add --no-cache \
     re2c \
     file \
     dpkg \
-    dpkg-dev
+    dpkg-dev \
+    shadow
 
-# Instala extensiones de PHP requeridas por Laravel + Octane
 RUN docker-php-ext-install \
     pdo_mysql \
     mbstring \
@@ -46,10 +43,8 @@ RUN docker-php-ext-install \
     && pecl install swoole \
     && docker-php-ext-enable swoole
 
-# Copia Composer desde la imagen oficial
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configuración de PHP personalizada
 ARG PHP_MEMORY_LIMIT=512M
 ARG PHP_MAX_EXECUTION_TIME=300
 ARG PHP_UPLOAD_MAX_FILESIZE=100M
@@ -59,7 +54,6 @@ RUN echo "memory_limit=${PHP_MEMORY_LIMIT}" > /usr/local/etc/php/conf.d/limits.i
     && echo "upload_max_filesize=${PHP_UPLOAD_MAX_FILESIZE}" >> /usr/local/etc/php/conf.d/limits.ini \
     && echo "post_max_size=${PHP_POST_MAX_SIZE}" >> /usr/local/etc/php/conf.d/limits.ini
 
-# Configuración OPcache para producción
 ARG OPCACHE_VALIDATE_TIMESTAMPS=0
 ARG OPCACHE_MEMORY_CONSUMPTION=128
 RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
@@ -74,33 +68,20 @@ RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.jit_buffer_size=100M" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.jit=1235" >> /usr/local/etc/php/conf.d/opcache.ini
 
-# Crea usuario no root para ejecutar la aplicación
-ARG NON_ROOT_USER=www-data
-ARG NON_ROOT_GROUP=www-data
-RUN addgroup -S $NON_ROOT_GROUP && adduser -S $NON_ROOT_USER -G $NON_ROOT_GROUP
-
-# Directorio principal de la app
 WORKDIR /var/www/html
 
-# Copia los archivos del proyecto
-COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP . /var/www/html
+COPY . /var/www/html
 
-# Permisos para Laravel
-RUN mkdir -p storage/logs \
-    && chown -R $NON_ROOT_USER:$NON_ROOT_GROUP storage bootstrap/cache \
+RUN mkdir -p storage/logs bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Copia configuración del supervisor y crontab
-COPY .deploy/config/crontab /etc/crontabs/www-data
+COPY .deploy/config/crontab /etc/crontabs/root
 COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
-RUN chmod 0644 /etc/crontabs/$NON_ROOT_USER && chmod +x /usr/sbin/crond
+RUN chmod 0644 /etc/crontabs/root && chmod +x /usr/sbin/crond
 
-# Copia el entrypoint de ejecución
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Puerto que expone Octane con Swoole
 EXPOSE 8000
 
-# Entrypoint que corre supervisord (Octane + cron en segundo plano)
 ENTRYPOINT ["/entrypoint.sh"]
