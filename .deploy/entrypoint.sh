@@ -3,9 +3,15 @@
 echo "📦 Iniciando contenedor de Laravel Octane..."
 
 # ========================================
-# 1. Esperar conexión con la base de datos
+# 1. Espera adicional para evitar race conditions
 # ========================================
-MAX_TRIES=30
+echo "🕒 Esperando 10 segundos por inicialización de MySQL..."
+sleep 10
+
+# ========================================
+# 2. Esperar conexión con la base de datos
+# ========================================
+MAX_TRIES=60
 TRIES=0
 
 echo "⏳ Verificando conexión con la base de datos en $DB_HOST:$DB_PORT..."
@@ -14,17 +20,17 @@ until php artisan migrate:status > /dev/null 2>&1; do
   TRIES=$((TRIES + 1))
   if [ "$TRIES" -ge "$MAX_TRIES" ]; then
     echo "❌ No se pudo conectar a la base de datos después de $MAX_TRIES intentos."
-    echo "   Verifica que el contenedor de MySQL esté levantado y accesible desde la app."
+    echo "   Verifica credenciales, red y si el contenedor de base de datos está accesible."
     exit 1
   fi
   echo "⏳ Intento $TRIES/$MAX_TRIES... esperando 2 segundos."
   sleep 2
 done
 
-echo "✅ Base de datos disponible."
+echo "✅ Conexión con la base de datos establecida."
 
 # ========================================
-# 2. Instalar dependencias si faltan
+# 3. Instalar dependencias si faltan
 # ========================================
 if [ ! -d vendor ]; then
   echo "🔧 Instalando dependencias con Composer..."
@@ -32,9 +38,9 @@ if [ ! -d vendor ]; then
 fi
 
 # ========================================
-# 3. Cache de Laravel
+# 4. Limpiar y cachear configuración
 # ========================================
-echo "⚙️  Limpiando y generando caché de Laravel..."
+echo "⚙️  Generando cachés..."
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
@@ -44,35 +50,35 @@ php artisan route:cache
 php artisan view:cache
 
 # ========================================
-# 4. Ejecutar migraciones
+# 5. Ejecutar migraciones
 # ========================================
 if [ "$RUN_MIGRATIONS" = "true" ]; then
   echo "🧩 Ejecutando migraciones..."
   php artisan migrate --force || {
-    echo "❌ Error al ejecutar migraciones. Revisa tus archivos de migración o conexión de base de datos."
+    echo "❌ Error durante las migraciones."
     exit 1
   }
 fi
 
 # ========================================
-# 5. Ejecutar seeders
+# 6. Ejecutar seeders
 # ========================================
 if [ "$RUN_SEEDERS" = "true" ]; then
   echo "🌱 Ejecutando seeders..."
   php artisan db:seed --force || {
-    echo "❌ Error al ejecutar seeders."
+    echo "❌ Error durante los seeders."
     exit 1
   }
 fi
 
 # ========================================
-# 6. Permisos
+# 7. Ajustar permisos
 # ========================================
-echo "🔐 Verificando permisos de storage y cache..."
+echo "🔐 Ajustando permisos de directorios..."
 chmod -R 775 storage bootstrap/cache || true
 
 # ========================================
-# 7. Iniciar Supervisor (Octane + Cron)
+# 8. Iniciar Supervisor (Octane + Cron)
 # ========================================
-echo "🚀 Iniciando Supervisor con Octane y Cron..."
+echo "🚀 Iniciando Supervisor..."
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
