@@ -27,9 +27,9 @@ RUN pecl install swoole && docker-php-ext-enable swoole
 WORKDIR /var/www
 
 # Copiar configuraciones
-COPY _deploy/entrypoint.sh /entrypoint.sh
-COPY _deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
-COPY _deploy/config/crontab /etc/cron.d/laravel
+COPY .deploy/entrypoint.sh /entrypoint.sh
+COPY .deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
+COPY .deploy/config/crontab /etc/cron.d/laravel
 RUN chmod +x /entrypoint.sh && chmod 0644 /etc/cron.d/laravel && crontab /etc/cron.d/laravel
 
 ENTRYPOINT ["/entrypoint.sh"]
