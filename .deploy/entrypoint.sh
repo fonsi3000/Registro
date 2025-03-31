@@ -1,31 +1,36 @@
 #!/bin/bash
 set -e
 
+cd $LARAVEL_PATH
+
 # Esperar a que la base de datos esté lista
-echo "Esperando que la base de datos esté lista..."
+echo "Esperando a que la base de datos esté lista..."
 sleep 5
 
-cd /var/www/html
-
-# Verificar si existe el archivo .env, si no, copiarlo del ejemplo
+# Verificar si existe el archivo .env
 if [ ! -f .env ]; then
-    echo "Archivo .env no encontrado, creando a partir de .env.example..."
-    cp .env.example .env
+    echo "Archivo .env no encontrado, creando desde variables de entorno..."
+    touch .env
 fi
 
-# Establecer permisos correctos
+# Establecer permisos
 echo "Configurando permisos..."
-chown -R www-data:www-data /var/www/html
-chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache
+chown -R www-data:www-data $LARAVEL_PATH
+chmod -R 755 $LARAVEL_PATH/storage $LARAVEL_PATH/bootstrap/cache
 
-# Instalar dependencias si vendor no existe
-if [ ! -d vendor ]; then
+# Instalar dependencias si no existen
+if [ ! -d vendor ] || [ ! -f vendor/autoload.php ]; then
     echo "Instalando dependencias PHP..."
     composer install --no-interaction --no-dev --optimize-autoloader
+else
+    echo "Las dependencias ya están instaladas."
 fi
 
+# Generar autoloader optimizado
+composer dump-autoload --optimize
+
 # Generar clave si no existe
-if ! grep -q "APP_KEY=" .env || grep -q "APP_KEY=base64:" .env; then
+if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:TuClaveGeneradaConPhpArtisanKeyGenerate" ]; then
     echo "Generando clave de la aplicación..."
     php artisan key:generate --force
 fi
@@ -42,13 +47,15 @@ if [ "${RUN_SEEDERS}" = "true" ]; then
     php artisan db:seed --force
 fi
 
-# Optimizar la aplicación
-echo "Optimizando la aplicación..."
-php artisan optimize
-php artisan config:cache
+# Borrar caché y regenerarla
+php artisan optimize:clear
 php artisan route:cache
+php artisan config:cache
 php artisan view:cache
 
-# Iniciar supervisor para gestionar procesos
-echo "Iniciando supervisor..."
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+# Instalar Octane si es necesario
+php artisan octane:install --server=$OCTANE_SERVER --no-interaction
+
+# Iniciar Supervisord
+echo "Iniciando supervisord..."
+exec /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
