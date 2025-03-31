@@ -56,16 +56,16 @@ RUN { \
     } > /usr/local/etc/php/conf.d/limits.ini
 
 # Set cron job
-COPY ./.deploy/crontab /etc/crontabs/$NON_ROOT_USER
+COPY ./.deploy/config/crontab /etc/crontabs/$NON_ROOT_USER
 RUN chmod 777 /usr/sbin/crond
 RUN chown -R $NON_ROOT_USER:$NON_ROOT_GROUP /etc/crontabs/$NON_ROOT_USER && setcap cap_setgid=ep /usr/sbin/crond
 
 # Supervisor configuration
 RUN mkdir -p /etc/supervisor/conf.d
-COPY ./.deploy/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
 
 # PHP custom configuration
-COPY ./.deploy/php.ini /usr/local/etc/php/conf.d/php.ini
+COPY ./.deploy/config/php.ini /usr/local/etc/php/conf.d/php.ini
 
 # Copy app with proper ownership
 COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP . $LARAVEL_PATH/

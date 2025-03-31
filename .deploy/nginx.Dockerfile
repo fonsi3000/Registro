@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
 # Copiamos la configuración
-COPY .deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY .deploy/config/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Eliminamos la configuración predeterminada
 RUN rm -f /etc/nginx/conf.d/default.conf.default
