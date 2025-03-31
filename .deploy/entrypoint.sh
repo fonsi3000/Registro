@@ -1,35 +1,45 @@
-#!/bin/sh
+#!/bin/bash
 
-# Esperar a que la base de datos esté lista
-echo "Esperando a MySQL..."
-until nc -z -v -w30 "$DB_HOST" "$DB_PORT"; do
-  echo "Esperando a que MySQL ($DB_HOST:$DB_PORT) esté disponible..."
-  sleep 5
+set -e
+
+echo "🚀 Iniciando contenedor de Laravel..."
+
+# Esperar a que la base de datos esté disponible
+echo "⌛ Esperando a MySQL en $DB_HOST:$DB_PORT..."
+until nc -z "$DB_HOST" "$DB_PORT"; do
+  echo "⏳ Esperando a que MySQL esté disponible..."
+  sleep 2
 done
+echo "✅ MySQL está disponible."
 
-# Instalar dependencias si no existen
+# Instalar dependencias de composer si no existen
 if [ ! -d "vendor" ]; then
-    echo "Instalando dependencias de Composer..."
-    composer install --optimize-autoloader --no-dev
+  echo "📦 Instalando dependencias con Composer..."
+  composer install --no-interaction --prefer-dist --optimize-autoloader
 fi
 
-# Generar clave si no está seteada
+# Generar APP_KEY si no está definido
 if [ -z "$APP_KEY" ]; then
-    php artisan key:generate
+  echo "🔑 Generando APP_KEY..."
+  php artisan key:generate
 fi
 
-# Migraciones y seeders
+# Ejecutar migraciones si está habilitado en .env
 if [ "$RUN_MIGRATIONS" = "true" ]; then
-    php artisan migrate --force
+  echo "📂 Ejecutando migraciones..."
+  php artisan migrate --force
 fi
 
+# Ejecutar seeders si está habilitado en .env
 if [ "$RUN_SEEDERS" = "true" ]; then
-    php artisan db:seed --force
+  echo "🌱 Ejecutando seeders..."
+  php artisan db:seed --force
 fi
 
-# Iniciar servicios
-service cron start
-supervisord -c /etc/supervisor/conf.d/supervisor.conf &
+# Configurar permisos
+echo "🔒 Configurando permisos..."
+chmod -R 775 storage bootstrap/cache
 
-# Iniciar Octane
-php artisan octane:start --server=${OCTANE_SERVER} --host=0.0.0.0 --port=${OCTANE_PORT}
+# Iniciar supervisord (cron + octane)
+echo "🧠 Iniciando supervisord (cron + Octane)..."
+exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisor.conf
