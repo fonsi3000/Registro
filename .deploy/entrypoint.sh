@@ -40,14 +40,18 @@ fi
 # ========================================
 # 4. Limpiar y cachear configuración
 # ========================================
-echo "⚙️  Generando cachés..."
+echo "⚙️  Limpiando y generando cachés..."
 php artisan config:clear
+php artisan cache:clear
+php artisan config:cache
 php artisan route:clear
 php artisan view:clear
-
-php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+
+# Verificación del driver real de sesiones
+echo "🔍 SESSION_DRIVER en uso:"
+php -r "echo '→ ' . config('session.driver') . PHP_EOL;"
 
 # ========================================
 # 5. Ejecutar migraciones
