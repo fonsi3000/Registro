@@ -11,8 +11,8 @@ RUN install-php-extensions intl bcmath gd pdo_mysql opcache redis uuid exif pcnt
 # Install supervisord implementation
 COPY --from=ochinchina/supervisord:latest /usr/local/bin/supervisord /usr/local/bin/supervisord
 
-# Install composer
-COPY --from=composer/composer:2 /usr/local/bin/composer /usr/local/bin/composer
+# Install composer (corregido)
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 FROM php-system-setup AS app-setup
 
