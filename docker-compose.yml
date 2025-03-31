@@ -14,7 +14,7 @@ services:
     depends_on:
       - app
     networks:
-      - ${DOCKER_NETWORK}
+      - registros_network
     container_name: ${NGINX_CONTAINER_NAME}
 
   # Aplicación Laravel con Octane
@@ -60,7 +60,7 @@ services:
       - db
       - redis
     networks:
-      - ${DOCKER_NETWORK}
+      - registros_network
     container_name: ${APP_CONTAINER_NAME}
     ports:
       - "${APP_PORT}:8000"  # Puerto para Octane
@@ -77,9 +77,9 @@ services:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MYSQL_ROOT_HOST=${MYSQL_ROOT_HOST}
     volumes:
-      - ${DB_VOLUME_NAME}:/var/lib/mysql
+      - registros_db_data:/var/lib/mysql
     networks:
-      - ${DOCKER_NETWORK}
+      - registros_network
     container_name: ${DB_CONTAINER_NAME}
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_HEALTHCHECK_USER}", "-p${DB_HEALTHCHECK_PASSWORD}"]
@@ -94,17 +94,17 @@ services:
     ports:
       - "${REDIS_PORT}:6379"
     volumes:
-      - ${REDIS_VOLUME_NAME}:/data
+      - registros_redis_data:/data
     networks:
-      - ${DOCKER_NETWORK}
+      - registros_network
     container_name: ${REDIS_CONTAINER_NAME}
 
 networks:
-  ${DOCKER_NETWORK}:
+  registros_network:
     driver: bridge
 
 volumes:
-  ${DB_VOLUME_NAME}:
+  registros_db_data:
     driver: local
-  ${REDIS_VOLUME_NAME}:
+  registros_redis_data:
     driver: local
