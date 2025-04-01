@@ -43,43 +43,44 @@ FROM php-system-setup AS app-setup
 ENV LARAVEL_PATH=/srv/app
 WORKDIR $LARAVEL_PATH
 
-# Crear usuario no root
-ARG NON_ROOT_GROUP=${NON_ROOT_GROUP:-app}
-ARG NON_ROOT_USER=${NON_ROOT_USER:-app}
-RUN addgroup -S $NON_ROOT_GROUP && adduser -S $NON_ROOT_USER -G $NON_ROOT_GROUP && \
-    mkdir -p /run/php && chown -R $NON_ROOT_USER:$NON_ROOT_GROUP /run/php
+# Agregar usuario y grupo
+ARG NON_ROOT_GROUP=app
+ARG NON_ROOT_USER=app
+RUN addgroup -S $NON_ROOT_GROUP && adduser -S $NON_ROOT_USER -G $NON_ROOT_GROUP
+RUN addgroup $NON_ROOT_USER wheel
 
-# Copiar cron
+# Copiar y dar permisos a entrypoint como root
+COPY ./.deploy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Supervisord conf
+COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Cron
 COPY ./.deploy/config/crontab /etc/crontabs/$NON_ROOT_USER
-RUN chmod 600 /etc/crontabs/$NON_ROOT_USER && chown -R $NON_ROOT_USER:$NON_ROOT_GROUP /etc/crontabs/$NON_ROOT_USER
+RUN chmod 777 /usr/sbin/crond \
+    && chown -R $NON_ROOT_USER:$NON_ROOT_GROUP /etc/crontabs/$NON_ROOT_USER \
+    && setcap cap_setgid=ep /usr/sbin/crond
 
-# Copiar configuración PHP
-COPY ./.deploy/config/php.ini /usr/local/etc/php/conf.d/local.ini
-
-# Copiar Composer files e instalar dependencias
+# App y permisos antes de cambiar de usuario
 COPY composer.json composer.lock ./
 RUN chown -R $NON_ROOT_USER:$NON_ROOT_GROUP $LARAVEL_PATH
 
 USER $NON_ROOT_USER
-RUN git config --global --add safe.directory "$LARAVEL_PATH" && \
-    composer install --prefer-dist --no-scripts --no-dev --no-autoloader && \
-    rm -rf /home/$NON_ROOT_USER/.composer
+
+# Composer
+RUN composer install --prefer-dist --no-scripts --no-dev --no-autoloader
+RUN rm -rf /home/$NON_ROOT_USER/.composer
 
 # Copiar el resto del proyecto
 COPY --chown=$NON_ROOT_USER:$NON_ROOT_GROUP . $LARAVEL_PATH/
 
-# Build de assets
+# PHP settings
+COPY ./.deploy/config/php.ini /usr/local/etc/php/conf.d/local.ini
+
+# Assets
 RUN npm ci && npm run build
 
-# Asignar permisos correctos
-RUN mkdir -p storage/logs bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache
-
-# Copiar scripts de arranque
-COPY ./.deploy/entrypoint.sh /entrypoint.sh
-COPY ./.deploy/config/supervisor.conf /etc/supervisor/conf.d/supervisord.conf
-RUN chmod +x /entrypoint.sh
-
-# Exponer el puerto interno de Laravel
 EXPOSE 9000
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["sh", "/entrypoint.sh"]
