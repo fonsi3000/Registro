@@ -51,7 +51,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_HOST: ${MYSQL_ROOT_HOST}
     volumes:
-      - ${DB_VOLUME_NAME}:/var/lib/mysql
+      - registros_db_data:/var/lib/mysql
     networks:
       - ${DOCKER_NETWORK}
 
@@ -59,10 +59,10 @@ services:
     image: redis:7-alpine
     container_name: ${REDIS_CONTAINER_NAME}
     volumes:
-      - ${REDIS_VOLUME_NAME}:/data
+      - registros_redis_data:/data
     networks:
       - ${DOCKER_NETWORK}
-    # Uncomment if Redis auth is used
+    # Descomenta esta línea si Redis tiene contraseña:
     # command: redis-server --requirepass "${REDIS_PASSWORD}"
 
 networks:
@@ -70,5 +70,5 @@ networks:
     driver: bridge
 
 volumes:
-  ${DB_VOLUME_NAME}:
-  ${REDIS_VOLUME_NAME}:
+  registros_db_data:
+  registros_redis_data:
