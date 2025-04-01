@@ -1,8 +1,12 @@
 FROM nginx:alpine
 
-COPY .deploy/config/nginx.conf /etc/nginx/conf.d/default.conf
+# Instalar openssl
+RUN apk add --no-cache openssl
 
-# SSL autofirmado
+# Copiar configuración personalizada
+COPY .deploy/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Generar certificado SSL autofirmado
 RUN mkdir -p /etc/nginx/ssl && \
     openssl req -x509 -nodes -days 365 \
     -subj "/C=US/ST=State/L=City/O=Company/CN=localhost" \
