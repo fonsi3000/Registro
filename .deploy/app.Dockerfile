@@ -35,7 +35,7 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 COPY .deploy/config/php.ini /usr/local/etc/php/php.ini
 COPY .deploy/config/supervisor.conf /etc/supervisord.conf
 COPY .deploy/config/crontab /etc/crontabs/root
-COPY .deploy/config/entrypoint.sh /entrypoint.sh
+COPY .deploy/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 

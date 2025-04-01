@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: .deploy/config/app.Dockerfile
+      dockerfile: .deploy/app.Dockerfile
       args:
         PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT}
         PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME}
@@ -27,7 +27,7 @@ services:
   nginx:
     build:
       context: .
-      dockerfile: .deploy/config/nginx.Dockerfile
+      dockerfile: .deploy/nginx.Dockerfile
     container_name: ${NGINX_CONTAINER_NAME}
     ports:
       - "${NGINX_PORT}:80"
