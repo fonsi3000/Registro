@@ -4,7 +4,7 @@ FROM nginx:alpine
 RUN apk add --no-cache openssl
 
 # Copiar configuración personalizada
-COPY .deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY .deploy/config/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Generar certificado SSL autofirmado
 RUN mkdir -p /etc/nginx/ssl && \
