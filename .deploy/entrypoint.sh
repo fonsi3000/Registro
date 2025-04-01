@@ -1,88 +1,61 @@
 #!/bin/sh
 
-echo "📦 Iniciando contenedor de Laravel Octane..."
+echo "🎬 entrypoint.sh: [$(whoami)] [PHP $(php -r 'echo phpversion();')]"
 
 # ========================================
-# 1. Espera adicional para evitar race conditions
-# ========================================
-echo "🕒 Esperando 10 segundos por inicialización de MySQL..."
-sleep 10
-
-# ========================================
-# 2. Esperar conexión con la base de datos
-# ========================================
-MAX_TRIES=60
-TRIES=0
-
-echo "⏳ Verificando conexión con la base de datos en $DB_HOST:$DB_PORT..."
-
-until php artisan migrate:status > /dev/null 2>&1; do
-  TRIES=$((TRIES + 1))
-  if [ "$TRIES" -ge "$MAX_TRIES" ]; then
-    echo "❌ No se pudo conectar a la base de datos después de $MAX_TRIES intentos."
-    echo "   Verifica credenciales, red y si el contenedor de base de datos está accesible."
-    exit 1
-  fi
-  echo "⏳ Intento $TRIES/$MAX_TRIES... esperando 2 segundos."
-  sleep 2
-done
-
-echo "✅ Conexión con la base de datos establecida."
-
-# ========================================
-# 3. Instalar dependencias si faltan
+# 1. Instalar dependencias si no existen
 # ========================================
 if [ ! -d vendor ]; then
-  echo "🔧 Instalando dependencias con Composer..."
+  echo "📦 Instalando dependencias..."
   composer install --no-interaction --prefer-dist --optimize-autoloader
 fi
 
 # ========================================
-# 4. Limpiar y cachear configuración
+# 2. Dump autoload
 # ========================================
-echo "⚙️  Limpiando y generando cachés..."
-php artisan config:clear
-php artisan cache:clear
-php artisan config:cache
-php artisan route:clear
-php artisan view:clear
-php artisan route:cache
-php artisan view:cache
-
-# Verificación del driver real de sesiones
-echo "🔍 SESSION_DRIVER en uso:"
-php -r "echo '→ ' . config('session.driver') . PHP_EOL;"
+composer dump-autoload --no-interaction --no-dev --optimize
 
 # ========================================
-# 5. Ejecutar migraciones
+# 3. Ejecutar comandos de Artisan
 # ========================================
+echo "🎬 artisan commands"
+
+# ⚠️ Crea enlace simbólico al directorio de storage
+php artisan storage:link
+
+# ⚠️ Ejecutar migraciones si se desea
 if [ "$RUN_MIGRATIONS" = "true" ]; then
   echo "🧩 Ejecutando migraciones..."
-  php artisan migrate --force || {
-    echo "❌ Error durante las migraciones."
-    exit 1
-  }
+  php artisan migrate --force
 fi
 
-# ========================================
-# 6. Ejecutar seeders
-# ========================================
+# ⚠️ Ejecutar seeders si se desea
 if [ "$RUN_SEEDERS" = "true" ]; then
   echo "🌱 Ejecutando seeders..."
-  php artisan db:seed --force || {
-    echo "❌ Error durante los seeders."
-    exit 1
-  }
+  php artisan db:seed --force
 fi
 
 # ========================================
-# 7. Ajustar permisos
+# 4. Compilar assets si no existen
 # ========================================
-echo "🔐 Ajustando permisos de directorios..."
+if [ ! -f public/build/manifest.json ]; then
+  echo "🎨 Compilando assets con Vite (modo producción)..."
+  if command -v npm >/dev/null 2>&1; then
+    npm ci
+    npm run build
+  else
+    echo "⚠️ npm no está disponible, no se compilaron assets."
+  fi
+fi
+
+# ========================================
+# 5. Ajustar permisos
+# ========================================
+echo "🔐 Ajustando permisos..."
 chmod -R 775 storage bootstrap/cache || true
 
 # ========================================
-# 8. Iniciar Supervisor (Octane + Cron)
+# 6. Iniciar supervisord
 # ========================================
-echo "🚀 Iniciando Supervisor..."
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+echo "🚀 start supervisord"
+exec supervisord -c $LARAVEL_PATH/.deploy/config/supervisor.conf
