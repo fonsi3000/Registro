@@ -62,7 +62,7 @@ services:
       - registros_redis_data:/data
     networks:
       - registros_network
-    # command: redis-server --requirepass "${REDIS_PASSWORD}"  # si usas auth
+  command: redis-server --requirepass "${REDIS_PASSWORD}"  # si usas auth
 
 networks:
   registros_network:
