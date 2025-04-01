@@ -1,39 +1,17 @@
 #!/bin/sh
-set -e
 
-echo "🎬 entrypoint.sh: [app] [PHP $(php -r 'echo phpversion();')]"
+# Instalar dependencias si no están
+composer install --no-dev --optimize-autoloader
 
-# Esperar a que la base de datos esté lista (opcional)
-if [ -n "$DB_HOST" ]; then
-    until nc -z -v -w30 $DB_HOST $DB_PORT; do
-        echo "🔄 Esperando a que la base de datos ($DB_HOST:$DB_PORT) esté disponible..."
-        sleep 2
-    done
-fi
+# Cache Laravel
+php artisan config:cache
+php artisan route:cache
 
-# Verificar permisos y directorios críticos
-for dir in storage/app storage/framework storage/logs bootstrap/cache; do
-    if [ ! -d "$LARAVEL_PATH/$dir" ]; then
-        mkdir -p "$LARAVEL_PATH/$dir"
-        echo "📂 Directorio creado: $dir"
-    fi
-done
+# Migraciones
+php artisan migrate --force
 
-# Finalizar la instalación de Composer
-echo "🎮 dump-autoload"
-composer dump-autoload --optimize --quiet || true
+# Permisos
+chown -R www-data:www-data /var/www/html
 
-# Comandos de artisan
-echo "🎬 artisan commands"
-
-# Migraciones y caché (solo si DB está configurada)
-if [ -n "$DB_CONNECTION" ]; then
-    php artisan migrate --force || true
-    php artisan config:cache || true
-    php artisan route:cache || true
-    php artisan view:cache || true
-fi
-
-# Iniciar supervisord para gestionar los procesos
-echo "🚀 start supervisord"
-exec /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+# Lanzar supervisord (php-fpm y cron)
+exec supervisord -c /etc/supervisord.conf

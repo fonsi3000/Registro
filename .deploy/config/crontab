@@ -1,1 +1,1 @@
-* * * * * /usr/local/bin/php /srv/app/artisan schedule:run >> /proc/1/fd/1 2>/proc/1/fd/2
+* * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1
