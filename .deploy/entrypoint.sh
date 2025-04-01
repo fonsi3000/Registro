@@ -21,6 +21,7 @@ php artisan config:cache
 php artisan route:cache
 php artisan migrate --force
 php artisan storage:link
+php artisan key:generate
 
 # Lanzar supervisord (que maneja PHP-FPM y cron)
 exec supervisord -c /etc/supervisord.conf
