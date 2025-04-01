@@ -2,20 +2,10 @@ FROM php:8.2-fpm-alpine
 
 # Instala extensiones necesarias
 RUN apk add --no-cache \
-    bash \
-    git \
-    unzip \
-    libzip-dev \
-    libpng-dev \
-    libxml2-dev \
-    icu-dev \
-    oniguruma-dev \
-    tzdata \
-    curl \
-    supervisor \
-    shadow \
-    nginx \
-    openssl
+    bash git unzip libzip-dev libpng-dev libxml2-dev \
+    icu-dev oniguruma-dev tzdata curl supervisor shadow nginx openssl \
+    netcat-openbsd \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl intl
 
 RUN docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl intl
 
