@@ -17,7 +17,16 @@ RUN apk add --no-cache \
     nginx \
     openssl \
     netcat-openbsd \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl intl
+    php8-pecl-redis \  
+    && docker-php-ext-enable redis \
+    && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    mbstring \
+    zip \
+    exif \
+    pcntl \
+    intl
 
 # Instala Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
