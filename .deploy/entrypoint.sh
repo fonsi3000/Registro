@@ -14,7 +14,7 @@ until nc -z registros_redis 6379; do
 done
 echo "✅ Redis disponible"
 
-# Git safe directory para evitar advertencias en entornos CI/CD
+# Git safe directory para evitar advertencias
 git config --global --add safe.directory /var/www/html
 
 echo "📦 Instalando dependencias con Composer..."
@@ -27,8 +27,14 @@ echo "⚙️ Ejecutando comandos de Laravel..."
 php artisan config:cache
 php artisan route:cache
 php artisan migrate --force
-php artisan storage:link
-php artisan key:generate
+
+# Ignorar error si el enlace ya existe
+php artisan storage:link || true
+
+# Solo genera la key si no existe
+if [ ! -f .env ] || ! grep -q '^APP_KEY=base64:' .env; then
+  php artisan key:generate
+fi
 
 echo "✅ Laravel listo para producción"
 

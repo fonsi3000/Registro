@@ -1,10 +1,11 @@
 FROM php:8.2-fpm
 
-# Instala dependencias del sistema necesarias para compilar extensiones
+# Instala dependencias del sistema y PHP, incluyendo Swoole y Redis
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     unzip \
+    nano \
     libzip-dev \
     libpng-dev \
     libxml2-dev \
@@ -22,7 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     make \
-    linux-headers-generic \
     && pecl install redis \
     && pecl install swoole-5.0.3 \
     && docker-php-ext-enable redis swoole \
@@ -46,10 +46,10 @@ WORKDIR /var/www/html
 # Copia el código fuente del proyecto
 COPY . .
 
-# Asigna permisos adecuados para Laravel
+# Asigna permisos adecuados
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copia configuración personalizada
+# Configuración PHP, supervisor y cron
 COPY .deploy/config/php.ini /usr/local/etc/php/php.ini
 COPY .deploy/config/supervisor.conf /etc/supervisord.conf
 COPY .deploy/config/crontab /etc/cron.d/laravel
@@ -59,8 +59,8 @@ RUN chmod 0644 /etc/cron.d/laravel && crontab /etc/cron.d/laravel
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Expone el puerto de Octane (Swoole)
+# Puerto expuesto por Octane/Swoole
 EXPOSE 9000
 
-# Inicia Laravel y Supervisor
+# Comando por defecto
 CMD ["/entrypoint.sh"]
