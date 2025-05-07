@@ -55,5 +55,5 @@ RUN chmod +x /entrypoint.sh
 # Expone el puerto de Octane (Swoole)
 EXPOSE 9000
 
-# Ejecuta el script de entrada que arranca Laravel y supervisord
+# Ejecuta el script de entrada que arranca Laravel y supervisord s
 CMD ["/entrypoint.sh"]
