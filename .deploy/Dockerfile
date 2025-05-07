@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     libonig-dev \
     libssl-dev \
+    libbrotli-dev \
     pkg-config \
     libcurl4-openssl-dev \
     autoconf \
@@ -42,30 +43,26 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Composer
-RUN curl -sS https://getcomposer.org/installer | php && \
-    mv composer.phar /usr/local/bin/composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Node.js para compilar assets (opcional si usas Vite/NPM)
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
-
-# Directorio de trabajo
+# Establece el directorio de trabajo
 WORKDIR /var/www/html
+
+# Copia el código de la app
 COPY . .
 
-# Copia configuración personalizada
+# Permisos para Laravel
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Archivos de configuración personalizados
 COPY .deploy/config/php.ini /etc/php/8.2/fpm/php.ini
 COPY .deploy/config/supervisor.conf /etc/supervisord.conf
-COPY .deploy/config/crontab /etc/cron.d/laravel
+COPY .deploy/config/crontab /etc/cron.d/laravel-schedule
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Ajuste de permisos Laravel
-RUN chown -R www-data:www-data storage bootstrap/cache && \
-    chmod -R 775 storage bootstrap/cache
-
-# Expone el puerto de Octane (Swoole)
+# Puerto expuesto por Octane
 EXPOSE 9000
 
-# Entrypoint
+# Comando por defecto
 CMD ["/entrypoint.sh"]
