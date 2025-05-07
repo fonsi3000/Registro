@@ -1,6 +1,6 @@
 FROM php:8.2-fpm
 
-# Instala dependencias del sistema y PHP, incluyendo Swoole y Redis
+# Instala dependencias del sistema y PHP, incluyendo Redis y Swoole
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -18,13 +18,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cron \
     bash \
     gnupg \
-    netcat \
+    netcat-openbsd \
     autoconf \
     gcc \
     g++ \
     make \
     && pecl install redis \
-    && pecl install swoole-5.0.3 \
+    && pecl install swoole \
     && docker-php-ext-enable redis swoole \
     && docker-php-ext-install \
     pdo \
@@ -59,7 +59,7 @@ RUN chmod 0644 /etc/cron.d/laravel && crontab /etc/cron.d/laravel
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Puerto expuesto por Octane/Swoole
+# Puerto de Octane
 EXPOSE 9000
 
 # Comando por defecto
