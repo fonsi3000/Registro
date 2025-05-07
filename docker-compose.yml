@@ -4,40 +4,20 @@ services:
   app:
     build:
       context: .
-      dockerfile: .deploy/app.Dockerfile
-      args:
-        PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT}
-        PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME}
-        PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE}
-        PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE}
+      dockerfile: .deploy/Dockerfile
     container_name: ${APP_CONTAINER_NAME}
     environment:
       APP_ENV: ${APP_ENV}
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG}
       APP_URL: ${APP_URL}
+      OCTANE_SERVER: ${OCTANE_SERVER}
+      OCTANE_HTTPS: ${OCTANE_HTTPS}
     volumes:
       - .:/var/www/html
     depends_on:
       - db
       - redis
-    networks:
-      - ${DOCKER_NETWORK}
-
-  nginx:
-    build:
-      context: .
-      dockerfile: .deploy/nginx.Dockerfile
-    container_name: ${NGINX_CONTAINER_NAME}
-    ports:
-      - "${NGINX_PORT}:80"
-      - "${NGINX_SSL_PORT}:443" # ← Esto se mapea como 9043 en el .env
-    volumes:
-      - .:/var/www/html
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
-    depends_on:
-      - app
     networks:
       - ${DOCKER_NETWORK}
 
@@ -61,21 +41,13 @@ services:
     image: redis:7-alpine
     container_name: registros_redis
     ports:
-      - "6380:6379"  # ← Mapeo externo para Redis sin interferencia
-    networks:
-      - ${DOCKER_NETWORK}
-
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
+      - "${REDIS_EXTERNAL_PORT}:6379"
     networks:
       - ${DOCKER_NETWORK}
 
 networks:
-  registros_network:
-    driver: bridge
+  proxy_net:
+    external: true
 
 volumes:
   registros_db_data:

@@ -1,6 +1,6 @@
 FROM php:8.2-fpm-alpine
 
-# Instala extensiones necesarias del sistema y PHP
+# Instala extensiones necesarias del sistema y PHP, incluyendo Swoole
 RUN apk add --no-cache \
     bash \
     git \
@@ -14,12 +14,11 @@ RUN apk add --no-cache \
     curl \
     supervisor \
     shadow \
-    nginx \
     openssl \
     netcat-openbsd \
     $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && pecl install redis swoole \
+    && docker-php-ext-enable redis swoole \
     && docker-php-ext-install \
     pdo \
     pdo_mysql \
@@ -29,14 +28,13 @@ RUN apk add --no-cache \
     pcntl \
     intl
 
-
 # Instala Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Establece el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copia el código de la app
+# Copia el código fuente
 COPY . .
 
 # Asigna permisos adecuados
