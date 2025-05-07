@@ -16,8 +16,12 @@ RUN apk add --no-cache \
     shadow \
     openssl \
     netcat-openbsd \
+    autoconf \
+    g++ \
+    make \
     $PHPIZE_DEPS \
-    && yes '' | pecl install redis swoole \
+    && yes '' | pecl install redis \
+    && yes '' | pecl install swoole \
     && docker-php-ext-enable redis swoole \
     && docker-php-ext-install \
     pdo \
@@ -28,7 +32,6 @@ RUN apk add --no-cache \
     pcntl \
     intl
 
-
 # Instala Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -38,7 +41,7 @@ WORKDIR /var/www/html
 # Copia el código fuente del proyecto
 COPY . .
 
-# Asigna permisos adecuados para almacenamiento y caché
+# Asigna permisos adecuados para Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Copia configuración personalizada
@@ -50,8 +53,8 @@ COPY .deploy/entrypoint.sh /entrypoint.sh
 # Da permisos de ejecución al script de entrada
 RUN chmod +x /entrypoint.sh
 
-# Expone el puerto usado por Laravel Octane con Swoole
+# Expone el puerto usado por Octane/Swoole
 EXPOSE 9000
 
-# Inicia el contenedor ejecutando el script de arranque
+# Inicia Laravel y Supervisor
 CMD ["/entrypoint.sh"]
