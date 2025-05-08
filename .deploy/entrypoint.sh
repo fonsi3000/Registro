@@ -23,18 +23,21 @@ composer install --no-dev --optimize-autoloader || {
   exit 1
 }
 
+echo "🎨 Instalando y compilando assets frontend (npm)..."
+npm install
+npm run build || {
+  echo "❌ Falló compilación de frontend"
+  exit 1
+}
+
 echo "⚙️ Ejecutando comandos de Laravel..."
 php artisan config:cache
 php artisan route:cache
 php artisan migrate --force
+php artisan key:generate --force
 
-# Ignorar error si el enlace ya existe
+# Ignora si el enlace ya existe
 php artisan storage:link || true
-
-# Solo genera la key si no existe
-if [ ! -f .env ] || ! grep -q '^APP_KEY=base64:' .env; then
-  php artisan key:generate
-fi
 
 echo "✅ Laravel listo para producción"
 

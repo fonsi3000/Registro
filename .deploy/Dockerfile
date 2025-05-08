@@ -1,6 +1,6 @@
 FROM php:8.2-fpm-alpine
 
-# Instala extensiones necesarias del sistema y PHP
+# Instala dependencias del sistema y extensiones de PHP
 RUN apk add --no-cache \
     bash \
     git \
@@ -20,6 +20,8 @@ RUN apk add --no-cache \
     netcat-openbsd \
     freetype-dev \
     libjpeg-turbo-dev \
+    nodejs \
+    npm \
     $PHPIZE_DEPS \
     && pecl install redis \
     && docker-php-ext-enable redis \
@@ -41,7 +43,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Establece el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copia el código fuente de la aplicación
+# Copia el código fuente
 COPY . .
 
 # Asigna permisos adecuados para Laravel
@@ -56,8 +58,8 @@ COPY .deploy/entrypoint.sh /entrypoint.sh
 # Permisos
 RUN chmod +x /entrypoint.sh
 
-# Expone el puerto PHP-FPM
+# Expone puerto PHP-FPM
 EXPOSE 9000
 
-# Script de inicio
+# Punto de entrada
 CMD ["/entrypoint.sh"]
