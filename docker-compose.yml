@@ -13,6 +13,7 @@ services:
       APP_URL: ${APP_URL}
     volumes:
       - .:/var/www/html
+      - shared-public:/var/www/html/public   #  comparte carpeta public con el reverse-proxy
     ports:
       - "${APP_EXTERNAL_PORT}:${APP_PORT}"
     depends_on:
@@ -51,3 +52,4 @@ networks:
 
 volumes:
   registros_db_data:
+  shared-public:        # define el volumen compartido aquí
