@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: .deploy/Dockerfile
-    container_name: ${APP_CONTAINER_NAME}
+    container_name: registros_app
     environment:
       APP_ENV: ${APP_ENV}
       APP_KEY: ${APP_KEY}
@@ -13,18 +13,18 @@ services:
       APP_URL: ${APP_URL}
     volumes:
       - .:/var/www/html
-      - shared-public:/var/www/html/public   #  comparte carpeta public con el reverse-proxy
+      - shared-public:/var/www/html/public   # ✅ volumen externo compartido
     ports:
       - "${APP_EXTERNAL_PORT}:${APP_PORT}"
     depends_on:
       - db
       - redis
     networks:
-      - ${DOCKER_NETWORK}
+      - proxy_net
 
   db:
     image: mysql:8.0
-    container_name: ${DB_CONTAINER_NAME}
+    container_name: registros_db
     ports:
       - "${DB_EXTERNAL_PORT}:3306"
     environment:
@@ -36,15 +36,15 @@ services:
     volumes:
       - registros_db_data:/var/lib/mysql
     networks:
-      - ${DOCKER_NETWORK}
+      - proxy_net
 
   redis:
     image: redis:7-alpine
-    container_name: ${REDIS_CONTAINER_NAME}
+    container_name: registros_redis
     ports:
       - "${REDIS_EXTERNAL_PORT}:6379"
     networks:
-      - ${DOCKER_NETWORK}
+      - proxy_net
 
 networks:
   proxy_net:
@@ -52,4 +52,6 @@ networks:
 
 volumes:
   registros_db_data:
-  shared-public:        # define el volumen compartido aquí
+  shared-public:
+    external: true
+    name: shared-public   # ✅ indica que es un volumen externo ya creado
