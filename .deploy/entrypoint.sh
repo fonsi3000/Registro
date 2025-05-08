@@ -38,5 +38,5 @@ fi
 
 echo "✅ Laravel listo para producción"
 
-# Inicia Supervisor (Octane + Cron)
+# Inicia Supervisor (PHP-FPM + Cron)
 exec supervisord -c /etc/supervisord.conf
