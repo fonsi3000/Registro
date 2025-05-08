@@ -44,7 +44,7 @@ services:
     ports:
       - "${REDIS_EXTERNAL_PORT}:6379"
     networks:
-      - proxy_net
+      - proxy_net  # ✅ indica que la red externo ya creado osea crear una red global en el servidor 
 
 networks:
   proxy_net:
@@ -54,4 +54,4 @@ volumes:
   registros_db_data:
   shared-public:
     external: true
-    name: shared-public   # ✅ indica que es un volumen externo ya creado
+    name: shared-public   # ✅ indica que es un volumen externo ya creado osea crear una red global en el servidor  
