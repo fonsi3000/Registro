@@ -28,41 +28,54 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     make \
-    software-properties-common \
-    && add-apt-repository ppa:ondrej/php -y \
-    && apt-get update && apt-get install -y \
+    software-properties-common
+
+# Repositorio PHP Ondrej
+RUN add-apt-repository ppa:ondrej/php -y && \
+    apt-get update && \
+    apt-get install -y \
     php8.2 php8.2-cli php8.2-fpm php8.2-common php8.2-dev \
     php8.2-mysql php8.2-zip php8.2-gd php8.2-mbstring php8.2-curl \
-    php8.2-xml php8.2-bcmath php8.2-intl php8.2-readline \
-    && pecl install swoole \
-    && echo "extension=swoole.so" > /etc/php/8.2/mods-available/swoole.ini \
-    && phpenmod swoole \
-    && pecl install redis \
-    && echo "extension=redis.so" > /etc/php/8.2/mods-available/redis.ini \
-    && phpenmod redis \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    php8.2-xml php8.2-bcmath php8.2-intl php8.2-readline
 
-# Composer
+# Instalar y habilitar extensiones PECL
+RUN pecl install swoole && \
+    echo "extension=swoole.so" > /etc/php/8.2/mods-available/swoole.ini && \
+    phpenmod swoole && \
+    pecl install redis && \
+    echo "extension=redis.so" > /etc/php/8.2/mods-available/redis.ini && \
+    phpenmod redis
+
+# Limpiar cache apt
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Instalar Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Establece el directorio de trabajo
+# Crear y establecer directorio de trabajo
 WORKDIR /var/www/html
 
-# Copia el código de la app
+# Copiar código fuente
 COPY . .
 
-# Permisos para Laravel
+# Asignar permisos adecuados a Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Archivos de configuración personalizados
+# Copiar configuración PHP, Supervisor y crontab
 COPY .deploy/config/php.ini /etc/php/8.2/fpm/php.ini
 COPY .deploy/config/supervisor.conf /etc/supervisord.conf
 COPY .deploy/config/crontab /etc/cron.d/laravel-schedule
+
+# Hacer ejecutable el script de inicio
 COPY .deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Puerto expuesto por Octane
+# Dar permisos y registrar el cron
+RUN chmod 0644 /etc/cron.d/laravel-schedule && \
+    crontab /etc/cron.d/laravel-schedule
+
+# Exponer puerto usado por Octane
 EXPOSE 9000
 
-# Comando por defecto
+# Ejecutar entrypoint
 CMD ["/entrypoint.sh"]
